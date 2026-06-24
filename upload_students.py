@@ -43,3 +43,11 @@ for specialization, elevi in students.items():
         count += 1
 
 print(f"Uploaded {count} students")
+
+total = 0
+
+for specializare, elevi in students.items():
+    print(specializare, len(elevi))
+    total += len(elevi)
+
+print("TOTAL =", total)

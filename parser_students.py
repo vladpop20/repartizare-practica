@@ -33,6 +33,7 @@ def load_students():
             parts = [p.strip() for p in entry.split(",")]
 
             if len(parts) < 3:
+                print("EROARE:", entry)
                 continue
 
             last_name = parts[0]
@@ -47,4 +48,5 @@ def load_students():
                 (last_name, first_name, average)
             )
 
+    
     return students

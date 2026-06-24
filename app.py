@@ -13,6 +13,14 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 students = load_students()
+count = 0
+
+for specializare, elevi in students.items():
+    st.write(specializare, len(elevi))
+    count += len(elevi)
+
+st.write("TOTAL:", count)
+st.write(students.keys())
 units = load_units()
 
 st.title("Simulare repartizare practica")
@@ -76,6 +84,8 @@ st.write(f"ID: {student_id}")
 
 student_record = get_student(student_id)
 
+st.write(student_record)
+
 saved_choice = get_choice(student_id)
 
 gender = get_gender(
@@ -88,13 +98,20 @@ st.info(f"Gen: {gender}")
 
 st.subheader("Autentificare")
 
-if student_record["username"] is None:
+if not student_record["username"]:
 
     st.info("Nu ai cont. Creeaza unul.")
 
-    username = st.text_input(
-        "Username"
+    generated_username = (
+        last_name.lower()
+        + "."
+        + first_name.lower()
     )
+
+    st.info(
+        f"Username-ul tau va fi: {generated_username}"
+    )
+
 
     password = st.text_input(
         "Parola",
@@ -115,7 +132,7 @@ if student_record["username"] is None:
 
             create_account(
                 student_id,
-                username,
+                generated_username,
                 password
             )
 
@@ -125,9 +142,11 @@ if student_record["username"] is None:
 
 else:
 
-    username = st.text_input(
-        "Username"
+    st.info(
+        f"Username: {student_record['username']}"
     )
+
+    username = student_record["username"]
 
     password = st.text_input(
         "Parola",
@@ -147,7 +166,13 @@ else:
 
             st.success(
                 "Autentificat!"
-            )   
+            )
+
+        else:
+
+            st.error(
+                "Date incorecte"
+            )
 
 for index, (nume, prenume, medie) in enumerate(elevi, start=1):
     if f"{prenume} {nume} ({medie})" == elev_selectat:
