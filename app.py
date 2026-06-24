@@ -13,14 +13,14 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 students = load_students()
-count = 0
+# count = 0
 
-for specializare, elevi in students.items():
-    st.write(specializare, len(elevi))
-    count += len(elevi)
+# for specializare, elevi in students.items():
+#     st.write(specializare, len(elevi))
+#     count += len(elevi)
 
-st.write("TOTAL:", count)
-st.write(students.keys())
+# st.write("TOTAL:", count)
+# st.write(students.keys())
 units = load_units()
 
 st.title("Simulare repartizare practica")
@@ -84,7 +84,7 @@ st.write(f"ID: {student_id}")
 
 student_record = get_student(student_id)
 
-st.write(student_record)
+# st.write(student_record)
 
 saved_choice = get_choice(student_id)
 
