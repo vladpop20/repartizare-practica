@@ -80,7 +80,7 @@ if (
     st.session_state["authenticated"] = False
     st.session_state["student_id"] = None
 
-st.write(f"ID: {student_id}")
+# st.write(f"ID: {student_id}")
 
 student_record = get_student(student_id)
 
