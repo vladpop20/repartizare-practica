@@ -11,6 +11,8 @@ def get_student(student_id):
         .execute()
     )
 
+    print(result)
+
     if len(result.data) == 0:
         return None
 

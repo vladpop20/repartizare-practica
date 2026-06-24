@@ -1,6 +1,17 @@
 import streamlit as st
 import pandas as pd
 
+ADMIN_PASSWORD = "Practica2026"
+
+password = st.text_input(
+    "Parola administrator",
+    type="password"
+)
+
+if password != ADMIN_PASSWORD:
+    st.warning("Introdu parola administrator.")
+    st.stop()
+
 from supabase_db import (
     get_all_choices,
     get_all_students
