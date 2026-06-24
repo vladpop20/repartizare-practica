@@ -1,0 +1,6 @@
+[ ] Login simplu
+[ ] Creare username/parolă
+[ ] Salvare choices în Supabase
+[ ] Citire choices din Supabase
+[ ] Simulare repartizare
+[ ] Publicare Streamlit Cloud
