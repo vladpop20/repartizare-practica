@@ -4,6 +4,14 @@ import pandas as pd
 from supabase_db import (
     get_all_students,
     get_all_choices,
+    get_all_units,
+    save_allocation,
+    clear_allocations
+)
+
+from supabase_db import (
+    get_all_students,
+    get_all_choices,
     get_all_units
 )
 
@@ -41,6 +49,8 @@ for choice in choices:
 
 results = []
 
+clear_allocations()
+
 for student in students_sorted:
 
     student_id = student["id"]
@@ -51,6 +61,7 @@ for student in students_sorted:
     choice = choices_map[student_id]
 
     allocated = "NEREPARTIZAT"
+    allocation_rank = 0
 
     options = [
         choice["option1"],
@@ -58,7 +69,10 @@ for student in students_sorted:
         choice["option3"]
     ]
 
-    for option in options:
+    for rank, option in enumerate(
+        options,
+        start = 1
+    ):
 
         if option not in unit_capacity:
             continue
@@ -70,6 +84,7 @@ for student in students_sorted:
                 unit_capacity[option]["boys"] -= 1
 
                 allocated = option
+                allocation_rank = rank
 
                 break
 
@@ -80,6 +95,7 @@ for student in students_sorted:
                 unit_capacity[option]["girls"] -= 1
 
                 allocated = option
+                allocation_rank = rank
 
                 break
 
