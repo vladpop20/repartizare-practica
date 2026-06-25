@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 from supabase_db import (
     get_all_students,
@@ -10,38 +11,37 @@ from monitor_utils import (
     build_monitor
 )
 
+from ui_utils import (
+    load_css,
+    render_unit_header,
+    render_option
+)
+
 st.set_page_config(
     page_title="Situația în timp real",
     layout="wide"
 )
 
-st.title("Situația în timp real")
+st_autorefresh(
+    interval=10000,
+    key="live_monitor"
+)
+
+load_css()
+
+st.title("📊 Situația în timp real")
 
 st.caption(
     "Actualizare automată la fiecare 10 secunde"
 )
 
-specializare = st.selectbox(
-    "Specializare",
-    [
-        "Comunicatii",
-        "Aparare Cibernetica",
-        "Securitate Militara",
-        "Tehnologia Informatiei"
-    ]
-)
-
-cautare = st.text_input(
-    "🔍 Caută elev"
-)
+#
+# Date
+#
 
 students = get_all_students()
-
 choices = get_all_choices()
-
 units = get_all_units()
-
-st.write(units[0])
 
 monitor = build_monitor(
     students,
@@ -49,109 +49,126 @@ monitor = build_monitor(
     units
 )
 
-st.write(type(monitor))
+#
+# Filtre
+#
 
-st.write(monitor)
+specializare = st.selectbox(
+    "Specializare",
+    list(monitor.keys())
+)
 
-st.stop()
+cautare = st.text_input(
+    "🔍 Caută elev"
+).strip().lower()
 
-# st.write(monitor.keys())
-
-students_map = {}
-
-for student in students:
-
-    students_map[
-        student["id"]
-    ] = student
+#
+# Unități
+#
 
 for unit_name, unit in monitor[specializare].items():
 
+    #
+    # dacă nu există niciun elev pe nicio opțiune,
+    # nu afișăm unitatea
+    #
+
     exista = False
 
-    for option in [
+    for option in (
         "option1",
         "option2",
         "option3"
-    ]:
+    ):
 
-        for student in unit[option]["boys"]:
-
-            if (
-                student["specialization"]
-                ==
-                specializare
-            ):
-
-                exista = True
-
-        for student in unit[option]["girls"]:
-
-            if (
-                student["specialization"]
-                ==
-                specializare
-            ):
-
-                exista = True
+        if unit[option]["boys"] or unit[option]["girls"]:
+            exista = True
+            break
 
     if not exista:
         continue
 
-    st.divider()
-
-    st.header(unit_name)
-
     #
-    # OPTIUNEA 1
+    # căutare elev
     #
 
-    st.subheader("Opțiunea 1")
+    if cautare:
 
-    boys = unit["option1"]["boys"]
-    girls = unit["option1"]["girls"]
+        gasit = False
 
-    st.write(
-        f"Băieți: {len(boys)}/{unit['boys_capacity']}"
+        for option in (
+            "option1",
+            "option2",
+            "option3"
+        ):
+
+            for student in (
+                unit[option]["boys"] +
+                unit[option]["girls"]
+            ):
+
+                nume = (
+                    student["last_name"] +
+                    " " +
+                    student["first_name"]
+                ).lower()
+
+                if cautare in nume:
+                    gasit = True
+                    break
+
+            if gasit:
+                break
+
+        if not gasit:
+            continue
+
+    #
+    # Card unitate
+    #
+
+    render_unit_header(
+        unit_name,
+        unit
     )
 
-    st.progress(
-        min(
-            len(boys) / max(unit["boys_capacity"], 1),
-            1.0
-        )
+    #
+    # Tabs
+    #
+
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "🟩 Opțiunea 1",
+            "🟨 Opțiunea 2",
+            "🟧 Opțiunea 3"
+        ]
     )
 
-    st.write(
-        f"Fete: {len(girls)}/{unit['girls_capacity']}"
-    )
+    with tab1:
 
-    if unit["girls_capacity"] > 0:
-
-        st.progress(
-            min(
-                len(girls) / unit["girls_capacity"],
-                1.0
-            )
+        render_option(
+            unit,
+            "option1",
+            "Opțiunea 1",
+            cautare
         )
 
-    st.markdown("### Băieți")
+    with tab2:
 
-    for student in boys:
-
-        st.info(
-            f"🟦 {student['last_name']} {student['first_name']} ({student['average']})"
+        render_option(
+            unit,
+            "option2",
+            "Opțiunea 2",
+            cautare
         )
 
-    st.markdown("### Fete")
+    with tab3:
 
-    for student in girls:
-
-        st.error(
-            f"🟥 {student['last_name']} {student['first_name']} ({student['average']})"
+        render_option(
+            unit,
+            "option3",
+            "Opțiunea 3",
+            cautare
         )
 
-# st.write("Monitor construit!")
-# st.write(len(monitor))
-
-# st.write(monitor)
+    st.markdown("---")
