@@ -136,9 +136,14 @@ if not student_record["username"]:
                 password
             )
 
+            st.session_state["authenticated"] = True
+            st.session_state["student_id"] = student_id
+
             st.success(
-                "Cont creat!"
+                "Cont creat! Te autentificăm..."
             )
+
+            st.rerun()
 
 else:
 
