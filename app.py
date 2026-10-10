@@ -1,5 +1,12 @@
 import streamlit as st
 
+st.set_page_config(
+    page_title="Repartizare Practică",
+    page_icon="🎓",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
+
 from parser_students import load_students
 from parser_units import load_units
 from student_utils import get_gender
@@ -22,6 +29,111 @@ SPECIALIZATION_CODES = {
 }
 
 
+def load_app_css() -> None:
+    st.markdown("""
+<style>
+/* Centrare și limitare lățime container pe laptop/desktop, adaptiv pe mobil */
+.block-container {
+    max-width: 680px !important;
+    padding-top: 2rem !important;
+    padding-bottom: 3.5rem !important;
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+    margin: 0 auto !important;
+}
+
+/* Card profil elev conectat */
+.student-profile-header {
+    background: linear-gradient(135deg, #1e293b 0%, #172554 100%);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.profile-greeting {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 6px;
+}
+
+.profile-spec-badge {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.25);
+    color: #93c5fd;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+/* Banner opțiune salvată */
+.saved-choice-banner {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.saved-choice-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #6ee7b7;
+    margin-bottom: 4px;
+}
+
+.saved-choice-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+/* Butoane primare */
+.stButton > button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    padding: 0.55rem 1rem !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+/* Formulare și carduri */
+div[data-testid="stForm"] {
+    background: rgba(35, 42, 53, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 14px !important;
+    padding: 22px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Responsivitate pentru telefoane (>= 6.5 inchi) */
+@media (max-width: 640px) {
+    .block-container {
+        padding-top: 1.25rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    h1 {
+        font-size: 1.7rem !important;
+    }
+    .profile-greeting {
+        font-size: 1.05rem;
+    }
+    div[data-testid="stForm"] {
+        padding: 16px !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 def init_session_state() -> None:
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -40,17 +152,21 @@ def make_student_id(specializare: str, last_name: str, first_name: str) -> str:
 
 
 def render_logout_header(student_record: dict) -> None:
-    left, right = st.columns([5, 1])
+    left, right = st.columns([4, 1])
 
     with left:
-        st.success(
-            f"👋 Salut, {student_record['first_name']} {student_record['last_name']}!"
-        )
-        st.caption(
-            f"Specializare: {student_record['specialization']}"
+        st.markdown(
+            f"""
+<div class="student-profile-header">
+    <div class="profile-greeting">👋 Salut, {student_record['first_name']} {student_record['last_name']}!</div>
+    <span class="profile-spec-badge">Specializare: {student_record['specialization']}</span>
+</div>
+""",
+            unsafe_allow_html=True,
         )
 
     with right:
+        st.write("")
         if st.button("Logout", use_container_width=True):
             st.session_state["authenticated"] = False
             st.session_state["student_id"] = None
@@ -131,7 +247,15 @@ def render_options(student_record: dict, units: dict) -> None:
                 remaining_spots[unit_name] = rem
 
     if saved_choice and saved_choice.get("option1"):
-        st.info(f"Opțiunea ta salvată în prezent: **{saved_choice['option1']}**")
+        st.markdown(
+            f"""
+<div class="saved-choice-banner">
+    <div class="saved-choice-label">Opțiunea ta salvată în prezent</div>
+    <div class="saved-choice-val">✅ {saved_choice['option1']}</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
     if not available_units:
         st.warning("Nu mai există locuri disponibile pentru profilul tău.")
@@ -171,11 +295,13 @@ def render_options(student_record: dict, units: dict) -> None:
 # Init
 # ============================================================
 init_session_state()
+load_app_css()
 
 students = load_students()
 units = load_units()
 
-st.title("Simulare repartizare practica")
+st.title("🎓 Repartizare practică")
+st.caption("Sistem de simulare și alocare a stagiilor de practică")
 
 # ============================================================
 # Already authenticated: hide login entirely
