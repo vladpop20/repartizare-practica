@@ -13,12 +13,13 @@ from monitor_utils import (
 
 from ui_utils import (
     load_css,
-    render_unit_header,
-    render_option
+    render_unit_card,
+    render_stats_sidebar
 )
 
 st.set_page_config(
     page_title="Situația în timp real",
+    page_icon="📊",
     layout="wide"
 )
 
@@ -29,16 +30,21 @@ st_autorefresh(
 
 load_css()
 
+#
+# Titlu și info banner
+#
 st.title("📊 Situația în timp real")
+st.caption("Actualizare automată la fiecare 10 secunde")
 
-st.caption(
-    "Actualizare automată la fiecare 10 secunde"
-)
+st.markdown("""
+<div class="info-alert-banner">
+    ℹ️ Fiecare casetă reprezintă un loc disponibil. <b>Albastru = băieți</b> | <b>Roșu = fete</b> | <b>Punctat = loc liber</b>
+</div>
+""", unsafe_allow_html=True)
 
 #
 # Date
 #
-
 students = get_all_students()
 choices = get_all_choices()
 units = get_all_units()
@@ -50,72 +56,74 @@ monitor = build_monitor(
 )
 
 #
-# Filtre
+# Filtre superioare
 #
+col_f1, col_f2 = st.columns([1, 1])
 
-specializare = st.selectbox(
-    "Specializare",
-    list(monitor.keys())
-)
-
-cautare = st.text_input(
-    "🔍 Caută elev"
-).strip().lower()
-
-#
-# Unități
-#
-
-for unit_name, unit in monitor[specializare].items():
-
-    #
-    # dacă nu există niciun elev pe opțiune,
-    # nu afișăm unitatea
-    #
-
-    if not (unit["option1"]["boys"] or unit["option1"]["girls"]):
-        continue
-
-    #
-    # căutare elev
-    #
-
-    if cautare:
-
-        gasit = False
-
-        for student in (
-            unit["option1"]["boys"] +
-            unit["option1"]["girls"]
-        ):
-
-            nume = (
-                student["last_name"] +
-                " " +
-                student["first_name"]
-            ).lower()
-
-            if cautare in nume:
-                gasit = True
-                break
-
-        if not gasit:
-            continue
-
-    #
-    # Card unitate
-    #
-
-    render_unit_header(
-        unit_name,
-        unit
+with col_f1:
+    specializare = st.selectbox(
+        "Specializare",
+        list(monitor.keys())
     )
 
-    render_option(
-        unit,
-        "option1",
-        "Opțiuni exprimate",
-        cautare
+with col_f2:
+    cautare = st.text_input(
+        "🔍 Caută elev",
+        placeholder="Nume sau prenume..."
+    ).strip().lower()
+
+#
+# Layout principal cu 2 coloane: Stânga (Unități de practică) | Dreapta (Statistici generale)
+#
+col_left, col_right = st.columns([7, 3])
+
+with col_left:
+    st.subheader("Unități de practică")
+
+    units_dict = monitor.get(specializare, {})
+    rendered_units = 0
+
+    for unit_name, unit in units_dict.items():
+
+        # Filtrare în caz de căutare activă
+        if cautare:
+            all_students_in_unit = (
+                unit["option1"]["boys"] +
+                unit["option1"]["girls"]
+            )
+            gasit = any(
+                cautare in f"{s['last_name']} {s['first_name']}".lower()
+                for s in all_students_in_unit
+            )
+            if not gasit:
+                continue
+
+        render_unit_card(
+            unit_name,
+            unit,
+            cautare
+        )
+        rendered_units += 1
+
+    if rendered_units == 0:
+        if cautare:
+            st.info(f"Niciun elev găsit pentru căutarea '{cautare}' în specializarea {specializare}.")
+        else:
+            st.info("Nu există unități de afișat pentru această specializare.")
+
+with col_right:
+    render_stats_sidebar(
+        specializare,
+        monitor,
+        students,
+        choices
     )
 
-    st.markdown("---")
+#
+# Notă informativă de final
+#
+st.markdown("""
+<div class="footer-alert-banner">
+    ✅ Ordinea elevilor în fiecare unitate este descrescătoare după medie.
+</div>
+""", unsafe_allow_html=True)
