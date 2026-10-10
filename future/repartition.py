@@ -64,9 +64,11 @@ for student in students_sorted:
     allocation_rank = 0
 
     options = [
-        choice["option1"],
-        choice["option2"],
-        choice["option3"]
+        opt for opt in [
+            choice.get("option1"),
+            choice.get("option2"),
+            choice.get("option3")
+        ] if opt
     ]
 
     for rank, option in enumerate(
@@ -113,13 +115,13 @@ for student in students_sorted:
                 student["specialization"],
 
             "Optiunea 1":
-                choice["option1"],
+                choice.get("option1"),
 
             "Optiunea 2":
-                choice["option2"],
+                choice.get("option2"),
 
             "Optiunea 3":
-                choice["option3"],
+                choice.get("option3"),
 
             "Repartizat":
                 allocated

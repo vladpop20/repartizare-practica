@@ -88,52 +88,27 @@ def render_options(student_record: dict, units: dict) -> None:
         st.warning("Nu exista unitati valide de afisat.")
         return
 
-    default1 = 0
-    default2 = 0
-    default3 = 0
+    default_index = 0
+    if saved_choice and saved_choice.get("option1") in unit_names:
+        default_index = unit_names.index(saved_choice["option1"])
 
-    if saved_choice:
-        if saved_choice.get("option1") in unit_names:
-            default1 = unit_names.index(saved_choice["option1"])
-        if saved_choice.get("option2") in unit_names:
-            default2 = unit_names.index(saved_choice["option2"])
-        if saved_choice.get("option3") in unit_names:
-            default3 = unit_names.index(saved_choice["option3"])
-
-    option1 = st.selectbox(
-        "Optiunea 1",
+    selected_unit = st.selectbox(
+        "Alege unitatea dorită",
         unit_names,
-        index=default1,
-        key=f"{student_id}_option1",
+        index=default_index,
+        key=f"{student_id}_selected_unit",
     )
 
-    option2 = st.selectbox(
-        "Optiunea 2",
-        unit_names,
-        index=default2,
-        key=f"{student_id}_option2",
-    )
+    if saved_choice and saved_choice.get("option1"):
+        st.info(f"Opțiunea ta salvată în prezent: **{saved_choice['option1']}**")
 
-    option3 = st.selectbox(
-        "Optiunea 3",
-        unit_names,
-        index=default3,
-        key=f"{student_id}_option3",
-    )
-
-    if st.button("Salveaza optiunile", key=f"{student_id}_save_choices"):
-        selected = {option1, option2, option3}
-
-        if len(selected) != 3:
-            st.error("Trebuie sa alegi 3 unitati diferite.")
-        else:
-            save_choice(
-                student_id,
-                option1,
-                option2,
-                option3,
-            )
-            st.toast("Optiunile au fost salvate.")
+    if st.button("Salvează opțiunea", key=f"{student_id}_save_choice", use_container_width=True):
+        save_choice(
+            student_id,
+            selected_unit,
+        )
+        st.toast("Opțiunea a fost salvată cu succes!")
+        st.rerun()
 
 
 # ============================================================

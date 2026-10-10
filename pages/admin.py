@@ -66,13 +66,13 @@ for choice in choices:
                 student["specialization"],
 
             "Optiunea 1":
-                choice["option1"],
+                choice.get("option1"),
 
             "Optiunea 2":
-                choice["option2"],
+                choice.get("option2"),
 
             "Optiunea 3":
-                choice["option3"]
+                choice.get("option3")
         }
     )
 

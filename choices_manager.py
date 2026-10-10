@@ -4,8 +4,8 @@ from supabase_client import supabase
 def save_choice(
     student_id,
     option1,
-    option2,
-    option3
+    option2=None,
+    option3=None
 ):
 
     supabase.table("choices").upsert({
