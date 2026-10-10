@@ -175,7 +175,7 @@ else:
     specializare = st.selectbox(
         "Selecteaza specializarea",
         list(students.keys()),
-        format_func=lambda s: f"{s} ({len(students[s])})",
+        format_func=lambda s: f"{s} ({len(students[s])} elevi)",
     )
 
     elevi = students[specializare]
