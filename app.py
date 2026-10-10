@@ -20,6 +20,7 @@ from supabase_db import (
     get_all_students,
 )
 from monitor_utils import normalize_spec
+from ui_utils import render_html
 
 SPECIALIZATION_CODES = {
     "Aparare Cibernetica": "AC",
@@ -30,7 +31,7 @@ SPECIALIZATION_CODES = {
 
 
 def load_app_css() -> None:
-    st.markdown("""
+    render_html("""
 <style>
 /* Centrare și limitare lățime container pe laptop/desktop, adaptiv pe mobil */
 .block-container {
@@ -131,7 +132,7 @@ div[data-testid="stForm"] {
     }
 }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 
 def init_session_state() -> None:
@@ -155,14 +156,13 @@ def render_logout_header(student_record: dict) -> None:
     left, right = st.columns([4, 1])
 
     with left:
-        st.markdown(
+        render_html(
             f"""
 <div class="student-profile-header">
     <div class="profile-greeting">👋 Salut, {student_record['first_name']} {student_record['last_name']}!</div>
     <span class="profile-spec-badge">Specializare: {student_record['specialization']}</span>
 </div>
-""",
-            unsafe_allow_html=True,
+"""
         )
 
     with right:
@@ -247,14 +247,13 @@ def render_options(student_record: dict, units: dict) -> None:
                 remaining_spots[unit_name] = rem
 
     if saved_choice and saved_choice.get("option1"):
-        st.markdown(
+        render_html(
             f"""
 <div class="saved-choice-banner">
     <div class="saved-choice-label">Opțiunea ta salvată în prezent</div>
     <div class="saved-choice-val">✅ {saved_choice['option1']}</div>
 </div>
-""",
-            unsafe_allow_html=True,
+"""
         )
 
     if not available_units:

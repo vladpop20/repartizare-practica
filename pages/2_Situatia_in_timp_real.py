@@ -13,6 +13,7 @@ from monitor_utils import (
 
 from ui_utils import (
     load_css,
+    render_html,
     render_unit_card,
     render_stats_sidebar
 )
@@ -36,11 +37,11 @@ load_css()
 st.title("📊 Situația în timp real")
 st.caption("Actualizare automată la fiecare 10 secunde")
 
-st.markdown("""
+render_html("""
 <div class="info-alert-banner">
     ℹ️ Fiecare casetă reprezintă un loc disponibil. <b>Albastru = băieți</b> | <b>Roșu = fete</b> | <b>Punctat = loc liber</b>
 </div>
-""", unsafe_allow_html=True)
+""")
 
 #
 # Date
@@ -122,8 +123,8 @@ with col_right:
 #
 # Notă informativă de final
 #
-st.markdown("""
+render_html("""
 <div class="footer-alert-banner">
     ✅ Ordinea elevilor în fiecare unitate este descrescătoare după medie.
 </div>
-""", unsafe_allow_html=True)
+""")

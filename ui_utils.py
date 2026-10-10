@@ -1,8 +1,20 @@
 import streamlit as st
 
 
+def render_html(html_str: str) -> None:
+    """
+    Randează HTML fără a permite parser-ului Markdown să interpreteze
+    liniile indentate (4+ spații) drept blocuri de cod <pre><code>.
+    """
+    clean = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
+    if hasattr(st, "html"):
+        st.html(clean)
+    else:
+        st.markdown(clean, unsafe_allow_html=True)
+
+
 def load_css():
-    st.markdown("""
+    render_html("""
 <style>
 /* Stil container principal */
 .block-container {
@@ -387,7 +399,7 @@ def load_css():
     background: rgba(255, 255, 255, 0.05);
 }
 </style>
-""", unsafe_allow_html=True)
+""")
 
 
 def render_unit_card(unit_name: str, unit: dict, cautare: str = "") -> None:
@@ -453,7 +465,7 @@ def render_unit_card(unit_name: str, unit: dict, cautare: str = "") -> None:
         {girls_slots_html}
     </div>
     """
-    st.markdown(card_html, unsafe_allow_html=True)
+    render_html(card_html)
 
 
 def render_stats_sidebar(specializare: str, monitor: dict, students: list, choices: list) -> None:
@@ -555,4 +567,4 @@ def render_stats_sidebar(specializare: str, monitor: dict, students: list, choic
         </div>
     </div>
     """
-    st.markdown(stats_html, unsafe_allow_html=True)
+    render_html(stats_html)
