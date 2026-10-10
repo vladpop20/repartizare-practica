@@ -1,42 +1,20 @@
+def normalize_spec(spec: str) -> str:
+    if not spec:
+        return ""
+    mapping = {
+        "comunicatii": "Comunicatii",
+        "aparare cibernetica": "Aparare Cibernetica",
+        "securitate militara": "Securitate Militara",
+        "tehnologia informatiei": "Tehnologia Informatiei",
+    }
+    return mapping.get(spec.strip().lower(), spec.strip())
+
+
 def build_monitor(
     students,
     choices,
     units
 ):
-    """
-    Structura rezultată:
-
-    monitor = {
-
-        "Comunicatii": {
-
-            "UM_01308 Bucuresti SMFT": {
-
-                "boys_capacity": 1,
-                "girls_capacity": 1,
-
-                "option1": {
-                    "boys": [],
-                    "girls": []
-                },
-
-                "option2": {
-                    "boys": [],
-                    "girls": []
-                },
-
-                "option3": {
-                    "boys": [],
-                    "girls": []
-                }
-
-            }
-
-        }
-
-    }
-    """
-
     monitor = {}
 
     #
@@ -45,21 +23,11 @@ def build_monitor(
 
     for unit in units:
 
-        specialization = unit["specialization"]
+        specialization = normalize_spec(unit["specialization"])
 
         if specialization not in monitor:
 
             monitor[specialization] = {}
-
-        #
-        # IMPORTANT:
-        #
-        # Nu sortăm unitățile.
-        #
-        # Ordinea rămâne EXACT cea din baza de date,
-        # adică aceeași ordine în care au fost încărcate
-        # din Unitati.txt.
-        #
 
         monitor[
             specialization
@@ -74,20 +42,6 @@ def build_monitor(
                 unit["girls"],
 
             "option1": {
-
-                "boys": [],
-                "girls": []
-
-            },
-
-            "option2": {
-
-                "boys": [],
-                "girls": []
-
-            },
-
-            "option3": {
 
                 "boys": [],
                 "girls": []
@@ -124,46 +78,36 @@ def build_monitor(
 
             continue
 
-        specialization = student["specialization"]
+        specialization = normalize_spec(student["specialization"])
 
         if specialization not in monitor:
 
             continue
 
-        options = [
+        unit_name = choice.get("option1")
 
-            ("option1", choice["option1"]),
+        if not unit_name or unit_name not in monitor[specialization]:
 
-            ("option2", choice["option2"]),
+            continue
 
-            ("option3", choice["option3"])
+        gender = (
 
-        ]
+            "boys"
 
-        for option_name, unit_name in options:
+            if student["gender"] == "B"
 
-            if unit_name not in monitor[specialization]:
+            else "girls"
 
-                continue
+        )
 
-            gender = (
-
-                "boys"
-
-                if student["gender"] == "B"
-
-                else "girls"
-
-            )
-
-            monitor[
-                specialization
-            ][
-                unit_name
-            ][
-                option_name
-            ][
-                gender
-            ].append(student)
+        monitor[
+            specialization
+        ][
+            unit_name
+        ][
+            "option1"
+        ][
+            gender
+        ].append(student)
 
     return monitor

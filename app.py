@@ -8,6 +8,11 @@ from students_db import (
     get_student,
     login,
 )
+from supabase_db import (
+    get_all_choices,
+    get_all_students,
+)
+from monitor_utils import normalize_spec
 
 SPECIALIZATION_CODES = {
     "Aparare Cibernetica": "AC",
@@ -65,28 +70,77 @@ def render_options(student_record: dict, units: dict) -> None:
 
     saved_choice = get_choice(student_id)
 
-    st.subheader("Unitati disponibile")
+    st.subheader("Selectare unitate de practică")
+
+    # Calculăm în timp real locurile ocupate de ALȚI elevi
+    all_choices = get_all_choices()
+    all_students = get_all_students()
+    students_map = {s["id"]: s for s in all_students}
+
+    norm_spec = normalize_spec(specializare)
+
+    occupied_spots = {}
+    for c in all_choices:
+        # Opțiunea elevului curent nu îi blochează propriul loc
+        if c["student_id"] == student_id:
+            continue
+        chosen_unit = c.get("option1")
+        if not chosen_unit:
+            continue
+        other_student = students_map.get(c["student_id"])
+        if not other_student:
+            continue
+        if (
+            normalize_spec(other_student.get("specialization", "")) == norm_spec
+            and other_student.get("gender") == gender
+        ):
+            occupied_spots[chosen_unit] = occupied_spots.get(chosen_unit, 0) + 1
+
+    # Găsim unitățile pentru specializarea curentă
+    spec_units = []
+    for s_name, u_list in units.items():
+        if normalize_spec(s_name) == norm_spec:
+            spec_units = u_list
+            break
 
     available_units = []
-    for unit in units.get(specializare, []):
-        if gender == "B" and unit["boys"] > 0:
-            available_units.append(unit)
-        elif gender == "F" and unit["girls"] > 0:
-            available_units.append(unit)
+    remaining_spots = {}
+
+    for unit in spec_units:
+        unit_name = unit.get("display", unit.get("unit_name", ""))
+        if not unit_name:
+            continue
+
+        if gender == "B":
+            capacity = unit.get("boys", 0)
+            if capacity <= 0:
+                continue  # Nu are locuri alocate pentru băieți
+            occupied = occupied_spots.get(unit_name, 0)
+            rem = capacity - occupied
+            if rem > 0:
+                available_units.append(unit)
+                remaining_spots[unit_name] = rem
+        elif gender == "F":
+            capacity = unit.get("girls", 0)
+            if capacity <= 0:
+                continue  # Nu are locuri alocate pentru fete
+            occupied = occupied_spots.get(unit_name, 0)
+            rem = capacity - occupied
+            if rem > 0:
+                available_units.append(unit)
+                remaining_spots[unit_name] = rem
+
+    if saved_choice and saved_choice.get("option1"):
+        st.info(f"Opțiunea ta salvată în prezent: **{saved_choice['option1']}**")
 
     if not available_units:
-        st.warning("Nu exista unitati disponibile pentru specializarea ta.")
+        st.warning("Nu mai există locuri disponibile pentru profilul tău.")
         return
 
     unit_names = [
         unit.get("display", unit.get("unit_name", ""))
         for unit in available_units
-        if unit.get("display", unit.get("unit_name", ""))
     ]
-
-    if not unit_names:
-        st.warning("Nu exista unitati valide de afisat.")
-        return
 
     default_index = 0
     if saved_choice and saved_choice.get("option1") in unit_names:
@@ -96,11 +150,13 @@ def render_options(student_record: dict, units: dict) -> None:
         "Alege unitatea dorită",
         unit_names,
         index=default_index,
+        format_func=lambda u: (
+            f"{u} ({remaining_spots.get(u, 1)} loc disponibil)"
+            if remaining_spots.get(u, 1) == 1
+            else f"{u} ({remaining_spots.get(u, 1)} locuri disponibile)"
+        ),
         key=f"{student_id}_selected_unit",
     )
-
-    if saved_choice and saved_choice.get("option1"):
-        st.info(f"Opțiunea ta salvată în prezent: **{saved_choice['option1']}**")
 
     if st.button("Salvează opțiunea", key=f"{student_id}_save_choice", use_container_width=True):
         save_choice(

@@ -69,23 +69,11 @@ cautare = st.text_input(
 for unit_name, unit in monitor[specializare].items():
 
     #
-    # dacă nu există niciun elev pe nicio opțiune,
+    # dacă nu există niciun elev pe opțiune,
     # nu afișăm unitatea
     #
 
-    exista = False
-
-    for option in (
-        "option1",
-        "option2",
-        "option3"
-    ):
-
-        if unit[option]["boys"] or unit[option]["girls"]:
-            exista = True
-            break
-
-    if not exista:
+    if not (unit["option1"]["boys"] or unit["option1"]["girls"]):
         continue
 
     #
@@ -96,28 +84,19 @@ for unit_name, unit in monitor[specializare].items():
 
         gasit = False
 
-        for option in (
-            "option1",
-            "option2",
-            "option3"
+        for student in (
+            unit["option1"]["boys"] +
+            unit["option1"]["girls"]
         ):
 
-            for student in (
-                unit[option]["boys"] +
-                unit[option]["girls"]
-            ):
+            nume = (
+                student["last_name"] +
+                " " +
+                student["first_name"]
+            ).lower()
 
-                nume = (
-                    student["last_name"] +
-                    " " +
-                    student["first_name"]
-                ).lower()
-
-                if cautare in nume:
-                    gasit = True
-                    break
-
-            if gasit:
+            if cautare in nume:
+                gasit = True
                 break
 
         if not gasit:
@@ -132,43 +111,11 @@ for unit_name, unit in monitor[specializare].items():
         unit
     )
 
-    #
-    # Tabs
-    #
-
-    tab1, tab2, tab3 = st.tabs(
-        [
-            "🟩 Opțiunea 1",
-            "🟨 Opțiunea 2",
-            "🟧 Opțiunea 3"
-        ]
+    render_option(
+        unit,
+        "option1",
+        "Opțiuni exprimate",
+        cautare
     )
-
-    with tab1:
-
-        render_option(
-            unit,
-            "option1",
-            "Opțiunea 1",
-            cautare
-        )
-
-    with tab2:
-
-        render_option(
-            unit,
-            "option2",
-            "Opțiunea 2",
-            cautare
-        )
-
-    with tab3:
-
-        render_option(
-            unit,
-            "option3",
-            "Opțiunea 3",
-            cautare
-        )
 
     st.markdown("---")
