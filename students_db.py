@@ -11,8 +11,6 @@ def get_student(student_id):
         .execute()
     )
 
-    print(result)
-
     if len(result.data) == 0:
         return None
 
@@ -43,7 +41,7 @@ def login(
         return False
 
     return (
-        student["username"] == username
+        str(student.get("username", "")).strip() == str(username).strip()
         and
-        student["password_hash"] == password
+        str(student.get("password_hash", "")).strip() == str(password).strip()
     )

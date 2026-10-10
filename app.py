@@ -6,7 +6,6 @@ from student_utils import get_gender
 from choices_manager import save_choice, get_choice
 from students_db import (
     get_student,
-    create_account,
     login,
 )
 
@@ -211,81 +210,30 @@ else:
         st.error("Elevul nu exista in baza de date students.")
         st.stop()
 
-    saved_choice = get_choice(student_id)
-
-    gender = student_record.get("gender") or get_gender(
-        specializare,
-        first_name,
-        last_name,
+    username = (
+        student_record.get("username")
+        or f"{last_name.lower().strip()}.{first_name.lower().strip()}"
     )
 
-    st.info(f"Gen: {gender}")
-
-    for index, (nume, prenume, medie) in enumerate(elevi, start=1):
-        if f"{prenume} {nume} ({medie})" == elev_selectat:
-            st.info(f"Pozitie in clasament: {index}")
-            st.info(f"Media: {medie}")
-            break
-
-    st.write(f"Numar elevi: {len(elevi)}")
-
     st.subheader("Autentificare")
+    st.info(f"Username: {username}")
 
-    if not student_record.get("username"):
-        st.info("Nu ai cont. Creeaza unul.")
-
-        generated_username = (
-            last_name.lower()
-            + "."
-            + first_name.lower()
-        )
-
-        st.info(f"Username-ul tau va fi: {generated_username}")
-
+    with st.form(key=f"{student_id}_login_form"):
         password = st.text_input(
-            "Parola",
-            type="password",
-            key=f"{student_id}_create_password",
-        )
-
-        confirm_password = st.text_input(
-            "Confirma parola",
-            type="password",
-            key=f"{student_id}_create_confirm_password",
-        )
-
-        if st.button("Creeaza cont", key=f"{student_id}_create_account"):
-            if password != confirm_password:
-                st.error("Parolele nu coincid")
-            else:
-                create_account(
-                    student_id,
-                    generated_username,
-                    password,
-                )
-                st.session_state["authenticated"] = True
-                st.session_state["student_id"] = student_id
-                st.toast("Cont creat. Te autentificam...")
-                st.rerun()
-
-    else:
-        st.info(f"Username: {student_record['username']}")
-
-        password = st.text_input(
-            "Parola",
+            "Parola (ultimele 6 cifre din CNP)",
             type="password",
             key=f"{student_id}_login_password",
         )
 
-        if st.button("Login", key=f"{student_id}_login"):
+        if st.form_submit_button("Login", use_container_width=True):
             if login(
                 student_id,
-                student_record["username"],
-                password,
+                username,
+                password.strip(),
             ):
                 st.session_state["authenticated"] = True
                 st.session_state["student_id"] = student_id
                 st.toast("Autentificat.")
                 st.rerun()
             else:
-                st.error("Date incorecte")
+                st.error("Parolă incorectă.")

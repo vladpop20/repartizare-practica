@@ -37,7 +37,9 @@ for specialization, elevi in students.items():
             "last_name": last_name,
             "first_name": first_name,
             "average": average,
-            "gender": gender
+            "gender": gender,
+            "username": f"{last_name.lower().strip()}.{first_name.lower().strip()}",
+            "password_hash": "123456"
         }).execute()
 
         count += 1
