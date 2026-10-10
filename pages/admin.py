@@ -20,11 +20,28 @@ st.set_page_config(
 def load_admin_css() -> None:
     render_html("""
 <style>
-/* Container principal */
+/* Container principal - spațiu generos pentru a preveni suprapunerea cu bara superioară Streamlit */
 .block-container {
-    padding-top: 1.5rem !important;
-    padding-bottom: 3rem !important;
+    padding-top: 4.25rem !important;
+    padding-bottom: 3.5rem !important;
     max-width: 1400px !important;
+}
+
+/* Buton deconectare admin */
+.logout-btn-container button {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+    color: #fca5a5 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.logout-btn-container button:hover {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+    color: #ffffff !important;
 }
 
 /* Card autentificare */
@@ -313,15 +330,20 @@ if not st.session_state["admin_authenticated"]:
 # ============================================================
 # Panou Admin Conectat
 # ============================================================
-header_left, header_right = st.columns([5, 1])
+header_left, header_right = st.columns([5, 1.2], vertical_alignment="center")
 with header_left:
-    st.title("🛡️ Panou Administrare")
-    st.caption("Evidența opțiunilor exprimate și distribuția elevilor pe unități")
+    render_html("""
+    <div style="margin-bottom: 8px;">
+        <h1 style="margin: 0; padding: 0; font-size: 2.1rem; font-weight: 800; color: #ffffff; line-height: 1.2;">🛡️ Panou Administrare</h1>
+        <div style="color: #94a3b8; font-size: 13.5px; margin-top: 4px;">Evidența opțiunilor exprimate și distribuția elevilor pe unități</div>
+    </div>
+    """)
 with header_right:
-    st.write("")
-    if st.button("Deconectare 🚪", use_container_width=True):
+    render_html('<div class="logout-btn-container">')
+    if st.button("🚪 Deconectare", use_container_width=True, key="admin_logout_btn"):
         st.session_state["admin_authenticated"] = False
         st.rerun()
+    render_html("</div>")
 
 #
 # Încărcare date
