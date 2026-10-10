@@ -174,35 +174,41 @@ def load_css():
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
 }
 
-/* Pe PC / Laptop / Tabletă mare (>= 992px): panoul rămâne fixat (sticky) la derulare printre unități */
+/* Pe PC / Laptop / Tabletă mare (>= 992px): panoul din dreapta rămâne fixat (sticky) la derulare printre unități */
 @media (min-width: 992px) {
+    /* Asigurăm că niciun container părinte nu blochează comportamentul sticky */
+    .block-container,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stHorizontalBlock"]:has(.stats-panel)),
+    div[data-testid="stVerticalBlock"]:has(.stats-panel) {
+        overflow: visible !important;
+    }
+
     div[data-testid="stHorizontalBlock"]:has(.stats-panel) {
         display: flex !important;
         flex-direction: row !important;
-        align-items: stretch !important;
+        align-items: flex-start !important;
+        overflow: visible !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) {
+    /* Coloana de statistici (stColumn) devine STICKY la nivel de coloană flex */
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel),
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:nth-child(2) {
         order: 2 !important;
-        overflow: visible !important;
-        height: auto !important;
-    }
-
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) > div,
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) [data-testid="stVerticalBlock"] {
-        height: 100% !important;
-        overflow: visible !important;
-    }
-
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)) {
-        order: 1 !important;
-    }
-
-    .stats-panel {
         position: -webkit-sticky !important;
         position: sticky !important;
         top: 60px !important;
+        align-self: flex-start !important;
         z-index: 40 !important;
+        overflow: visible !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)),
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:nth-child(1) {
+        order: 1 !important;
+        overflow: visible !important;
+    }
+
+    .stats-panel {
         max-height: calc(100vh - 80px) !important;
         overflow-y: auto !important;
     }
@@ -225,23 +231,27 @@ def load_css():
     }
 
     /* Panoul de statistici este ordonat primul (order: -1) */
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) {
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel),
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:nth-child(2) {
         order: -1 !important;
+        position: static !important;
+        top: auto !important;
         width: 100% !important;
         min-width: 100% !important;
         margin-bottom: 24px !important;
     }
 
     /* Unitățile de practică vin imediat sub statistici (order: 2) */
-    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)) {
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)),
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:nth-child(1) {
         order: 2 !important;
         width: 100% !important;
         min-width: 100% !important;
     }
 
     .stats-panel {
-        position: relative !important;
-        top: 0 !important;
+        position: static !important;
+        top: auto !important;
         max-height: none !important;
         overflow-y: visible !important;
     }
