@@ -41,6 +41,9 @@ render_html("""
 <div class="info-alert-banner">
     ℹ️ Fiecare casetă reprezintă un loc disponibil. <b>Albastru = băieți</b> | <b>Roșu = fete</b> | <b>Punctat = loc liber</b>
 </div>
+<div class="order-alert-banner">
+    ✅ Ordinea elevilor în fiecare unitate este descrescătoare după medie.
+</div>
 """)
 
 #
@@ -120,11 +123,4 @@ with col_right:
         choices
     )
 
-#
-# Notă informativă de final
-#
-render_html("""
-<div class="footer-alert-banner">
-    ✅ Ordinea elevilor în fiecare unitate este descrescătoare după medie.
-</div>
-""")
+

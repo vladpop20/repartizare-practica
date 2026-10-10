@@ -29,19 +29,20 @@ def load_css():
     border: 1px solid rgba(59, 130, 246, 0.35);
     border-radius: 10px;
     padding: 10px 16px;
-    margin-bottom: 18px;
+    margin-bottom: 8px;
     font-size: 13px;
     color: #93c5fd;
 }
 
-/* Banner de final */
+/* Banner informativ ordine medie */
+.order-alert-banner,
 .footer-alert-banner {
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.35);
     border-radius: 10px;
     padding: 10px 16px;
-    margin-top: 24px;
-    margin-bottom: 16px;
+    margin-top: 0;
+    margin-bottom: 18px;
     font-size: 13px;
     color: #6ee7b7;
     font-weight: 500;
@@ -171,6 +172,79 @@ def load_css():
     border-radius: 12px;
     padding: 18px;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+/* Pe PC / Laptop / Tabletă mare (>= 992px): panoul rămâne fixat (sticky) la derulare printre unități */
+@media (min-width: 992px) {
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) {
+        order: 2 !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) > div,
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) [data-testid="stVerticalBlock"] {
+        height: 100% !important;
+        overflow: visible !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)) {
+        order: 1 !important;
+    }
+
+    .stats-panel {
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 60px !important;
+        z-index: 40 !important;
+        max-height: calc(100vh - 80px) !important;
+        overflow-y: auto !important;
+    }
+
+    .stats-panel::-webkit-scrollbar {
+        width: 4px;
+    }
+    .stats-panel::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+    }
+}
+
+/* Pe telefoane smartphone (< 992px): panoul este mutat sus, deasupra primelor unități */
+@media (max-width: 991px) {
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+    }
+
+    /* Panoul de statistici este ordonat primul (order: -1) */
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:has(.stats-panel) {
+        order: -1 !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin-bottom: 24px !important;
+    }
+
+    /* Unitățile de practică vin imediat sub statistici (order: 2) */
+    div[data-testid="stHorizontalBlock"]:has(.stats-panel) > div[data-testid="stColumn"]:not(:has(.stats-panel)) {
+        order: 2 !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    .stats-panel {
+        position: relative !important;
+        top: 0 !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
 }
 
 .stats-title {
