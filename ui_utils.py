@@ -48,6 +48,28 @@ def load_css():
     font-weight: 500;
 }
 
+.status-active-badge {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.status-inactive-badge {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
 /* Card unitate */
 .unit-block {
     background: #141824;

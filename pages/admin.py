@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-from supabase_db import (
-    get_all_choices,
-    get_all_students,
-)
+import sessions_manager as sm
 from monitor_utils import normalize_spec
 from ui_utils import render_html
 
@@ -71,26 +68,6 @@ def load_admin_css() -> None:
     font-size: 13px;
     color: #94a3b8;
     margin-bottom: 20px;
-}
-
-/* Header administrator conectat */
-.admin-header {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding-bottom: 14px;
-    margin-bottom: 20px;
-}
-
-.admin-header-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 0;
-}
-
-.admin-header-sub {
-    font-size: 13px;
-    color: #94a3b8;
-    margin-top: 4px;
 }
 
 /* Carduri KPI */
@@ -257,6 +234,61 @@ def load_admin_css() -> None:
     font-weight: 600;
 }
 
+/* Carduri Configurare Tab 2 */
+.config-section-card {
+    background: #141824;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+
+.config-section-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+}
+
+.guide-box {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #93c5fd;
+    line-height: 1.5;
+}
+
+.status-active-badge {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.status-inactive-badge {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
 @media (max-width: 768px) {
     .kpi-row {
         grid-template-columns: repeat(2, 1fr);
@@ -335,7 +367,7 @@ with header_left:
     render_html("""
     <div style="margin-bottom: 8px;">
         <h1 style="margin: 0; padding: 0; font-size: 2.1rem; font-weight: 800; color: #ffffff; line-height: 1.2;">🛡️ Panou Administrare</h1>
-        <div style="color: #94a3b8; font-size: 13.5px; margin-top: 4px;">Evidența opțiunilor exprimate și distribuția elevilor pe unități</div>
+        <div style="color: #94a3b8; font-size: 13.5px; margin-top: 4px;">Gestiune sesiuni de practică, import promoții și evidența alegerilor</div>
     </div>
     """)
 with header_right:
@@ -346,179 +378,473 @@ with header_right:
     render_html("</div>")
 
 #
-# Încărcare date
+# Sesiuni disponibile
 #
-choices = get_all_choices()
-students = get_all_students()
-
-choices_map = {c["student_id"]: c for c in choices}
-
-all_records = []
-for s in students:
-    s_id = s["id"]
-    choice = choices_map.get(s_id)
-    opt1 = choice.get("option1") if choice else None
-
-    all_records.append({
-        "id": s_id,
-        "first_name": s.get("first_name", ""),
-        "last_name": s.get("last_name", ""),
-        "nume_complet": f"{s.get('last_name', '')} {s.get('first_name', '')}",
-        "average": float(s.get("average", 0.0)),
-        "specialization": s.get("specialization", ""),
-        "norm_spec": normalize_spec(s.get("specialization", "")),
-        "gender": s.get("gender", ""),
-        "option1": opt1,
-        "has_option": bool(opt1),
-    })
-
-# Sortare implicită descrescătoare după medie
-all_records.sort(key=lambda x: (x["average"], x["nume_complet"]), reverse=True)
+all_sessions = sm.get_all_sessions()
+active_session = sm.get_active_session()
 
 #
-# Statistici generale KPI
+# TABURI PRINCIPALE ADMIN
 #
-total_students = len(students)
-enrolled_count = len([r for r in all_records if r["has_option"]])
-unenrolled_count = max(total_students - enrolled_count, 0)
-enrolled_pct = (enrolled_count / total_students * 100) if total_students > 0 else 0
+tab_evidence, tab_config = st.tabs([
+    "📋 Evidență & Alegeri în timp real",
+    "⚙️ Configurare Promoții & Sesiuni (Import Excel)"
+])
 
-render_html(f"""
-<div class="kpi-row">
-    <div class="kpi-card kpi-blue">
-        <div class="kpi-num">{total_students}</div>
-        <div class="kpi-lbl">Total elevi</div>
+# ============================================================
+# TAB 1: EVIDENȚĂ & ALEGERI
+# ============================================================
+with tab_evidence:
+    # Selector sesiune pentru vizualizare
+    session_titles = [s["title"] for s in all_sessions]
+    default_idx = 0
+    if active_session:
+        for idx, s in enumerate(all_sessions):
+            if s["id"] == active_session["id"]:
+                default_idx = idx
+                break
+
+    col_s1, col_s2 = st.columns([4, 1.5], vertical_alignment="center")
+    with col_s1:
+        selected_session_title = st.selectbox(
+            "Selectează sesiunea / promoția de analizat",
+            session_titles,
+            index=default_idx,
+            key="evidence_session_select"
+        )
+    with col_s2:
+        selected_session = next((s for s in all_sessions if s["title"] == selected_session_title), all_sessions[0])
+        if selected_session.get("is_active"):
+            render_html('<div style="margin-top: 25px;"><span class="status-active-badge">🟢 Repartizare Activă în App</span></div>')
+        else:
+            render_html('<div style="margin-top: 25px;"><span class="status-inactive-badge">📁 Sesiune Închisă / Arhivată</span></div>')
+
+    current_sess_id = selected_session["id"]
+
+    # Date sesiune
+    choices = sm.get_choices_for_session(current_sess_id)
+    students = sm.get_students_for_session(current_sess_id)
+
+    choices_map = {c["student_id"]: c for c in choices}
+
+    all_records = []
+    for s in students:
+        s_id = s["id"]
+        choice = choices_map.get(s_id)
+        opt1 = choice.get("option1") if choice else None
+
+        all_records.append({
+            "id": s_id,
+            "first_name": s.get("first_name", ""),
+            "last_name": s.get("last_name", ""),
+            "nume_complet": f"{s.get('last_name', '')} {s.get('first_name', '')}",
+            "average": float(s.get("average", 0.0)),
+            "specialization": s.get("specialization", ""),
+            "norm_spec": normalize_spec(s.get("specialization", "")),
+            "gender": s.get("gender", ""),
+            "option1": opt1,
+            "has_option": bool(opt1),
+        })
+
+    all_records.sort(key=lambda x: (x["average"], x["nume_complet"]), reverse=True)
+
+    # Carduri KPI
+    total_students = len(students)
+    enrolled_count = len([r for r in all_records if r["has_option"]])
+    unenrolled_count = max(total_students - enrolled_count, 0)
+    enrolled_pct = (enrolled_count / total_students * 100) if total_students > 0 else 0
+
+    render_html(f"""
+    <div class="kpi-row">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-num">{total_students}</div>
+            <div class="kpi-lbl">Total elevi</div>
+        </div>
+        <div class="kpi-card kpi-green">
+            <div class="kpi-num">{enrolled_count}</div>
+            <div class="kpi-lbl">Opțiuni salvate</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+            <div class="kpi-num">{unenrolled_count}</div>
+            <div class="kpi-lbl">Fără opțiune</div>
+        </div>
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-num">{enrolled_pct:.1f}%</div>
+            <div class="kpi-lbl">Rată exprimare</div>
+        </div>
     </div>
-    <div class="kpi-card kpi-green">
-        <div class="kpi-num">{enrolled_count}</div>
-        <div class="kpi-lbl">Opțiuni salvate</div>
-    </div>
-    <div class="kpi-card kpi-amber">
-        <div class="kpi-num">{unenrolled_count}</div>
-        <div class="kpi-lbl">Fără opțiune</div>
-    </div>
-    <div class="kpi-card kpi-purple">
-        <div class="kpi-num">{enrolled_pct:.1f}%</div>
-        <div class="kpi-lbl">Rată exprimare</div>
-    </div>
-</div>
-""")
+    """)
 
-#
-# Filtre superioare
-#
-col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+    # Filtre
+    col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+    with col_f1:
+        specializari_options = ["Toate specializările"] + sorted(list({r["norm_spec"] for r in all_records if r["norm_spec"]}))
+        sel_spec = st.selectbox("Specializare", specializari_options, key="evidence_spec_filter")
 
-with col_f1:
-    specializari_options = ["Toate specializările"] + sorted(list({r["norm_spec"] for r in all_records if r["norm_spec"]}))
-    sel_spec = st.selectbox("Specializare", specializari_options)
+    with col_f2:
+        sel_status = st.selectbox(
+            "Filtru opțiuni",
+            ["Doar elevii cu opțiune salvată", "Toți elevii", "Doar fără opțiune"],
+            key="evidence_status_filter"
+        )
 
-with col_f2:
-    sel_status = st.selectbox(
-        "Filtru opțiuni",
-        ["Doar elevii cu opțiune salvată", "Toți elevii", "Doar fără opțiune"]
-    )
+    with col_f3:
+        cautare = st.text_input("🔍 Căutare", placeholder="Nume, prenume sau unitate...", key="evidence_search_input").strip().lower()
 
-with col_f3:
-    cautare = st.text_input("🔍 Căutare", placeholder="Nume, prenume sau unitate...").strip().lower()
-
-#
-# Aplicare filtre
-#
-filtered_records = []
-for r in all_records:
-    # Filtru status
-    if sel_status == "Doar elevii cu opțiune salvată" and not r["has_option"]:
-        continue
-    elif sel_status == "Doar fără opțiune" and r["has_option"]:
-        continue
-
-    # Filtru specializare
-    if sel_spec != "Toate specializările" and r["norm_spec"] != sel_spec:
-        continue
-
-    # Filtru căutare
-    if cautare:
-        text_target = f"{r['nume_complet']} {r['option1'] or ''}".lower()
-        if cautare not in text_target:
+    # Filtrare
+    filtered_records = []
+    for r in all_records:
+        if sel_status == "Doar elevii cu opțiune salvată" and not r["has_option"]:
+            continue
+        elif sel_status == "Doar fără opțiune" and r["has_option"]:
             continue
 
-    filtered_records.append(r)
+        if sel_spec != "Toate specializările" and r["norm_spec"] != sel_spec:
+            continue
 
-#
-# Export CSV
-#
-export_data = []
-for idx, r in enumerate(filtered_records, start=1):
-    export_data.append({
-        "Nr": idx,
-        "Nume": r["last_name"],
-        "Prenume": r["first_name"],
-        "Gen": r["gender"],
-        "Medie": r["average"],
-        "Specializare": r["norm_spec"],
-        "Unitate_Aleasa": (r["option1"] or "").replace("UM_", "UM "),
-    })
-df_export = pd.DataFrame(export_data)
-csv_bytes = df_export.to_csv(index=False).encode("utf-8")
+        if cautare:
+            text_target = f"{r['nume_complet']} {r['option1'] or ''}".lower()
+            if cautare not in text_target:
+                continue
 
-col_info, col_export = st.columns([4, 1.2])
-with col_info:
-    st.caption(f"Afișați **{len(filtered_records)}** din **{total_students}** elevi (sortați descrescător după medie).")
-with col_export:
-    st.download_button(
-        label="📥 Descarcă CSV",
-        data=csv_bytes,
-        file_name=f"alegeri_practica_{sel_spec.replace(' ', '_')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+        filtered_records.append(r)
 
-#
-# Randare Tabel Contrastat (fără Optiunea 2 și 3)
-#
-if len(filtered_records) == 0:
-    st.info("Niciun elev găsit conform filtrelor selectate.")
-else:
-    table_rows = []
+    # Export CSV
+    export_data = []
     for idx, r in enumerate(filtered_records, start=1):
-        spec_badge = get_spec_badge_html(r["specialization"])
-        gender_badge = get_gender_html(r["gender"])
-        unit_badge = get_unit_html(r["option1"])
-        avg_formatted = f"{r['average']:.2f}"
+        export_data.append({
+            "Nr": idx,
+            "Nume": r["last_name"],
+            "Prenume": r["first_name"],
+            "Gen": r["gender"],
+            "Medie": r["average"],
+            "Specializare": r["norm_spec"],
+            "Unitate_Aleasa": (r["option1"] or "").replace("UM_", "UM "),
+        })
+    df_export = pd.DataFrame(export_data)
+    csv_bytes = df_export.to_csv(index=False).encode("utf-8")
 
-        table_rows.append(f"""
-        <tr>
-            <td style="color: #64748b; font-weight: 600;">{idx}</td>
-            <td style="font-weight: 700; color: #ffffff;">{r['last_name']} {r['first_name']}</td>
-            <td>{gender_badge}</td>
-            <td><span class="badge-grade">{avg_formatted}</span></td>
-            <td>{spec_badge}</td>
-            <td>{unit_badge}</td>
-        </tr>
-        """)
+    col_info, col_export = st.columns([4, 1.2])
+    with col_info:
+        st.caption(f"Afișați **{len(filtered_records)}** din **{total_students}** elevi (sortați descrescător după medie).")
+    with col_export:
+        st.download_button(
+            label="📥 Descarcă CSV",
+            data=csv_bytes,
+            file_name=f"alegeri_{current_sess_id}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="download_csv_tab1"
+        )
 
-    table_html = f"""
-    <div class="admin-table-container">
-        <div class="admin-table-header">
-            <div class="admin-table-title">📋 Alegeri detaliate</div>
-            <div class="admin-table-count">Afișați <b>{len(filtered_records)}</b> elevi</div>
+    # Tabel HTML
+    if len(filtered_records) == 0:
+        st.info("Niciun elev găsit conform filtrelor selectate.")
+    else:
+        table_rows = []
+        for idx, r in enumerate(filtered_records, start=1):
+            spec_badge = get_spec_badge_html(r["specialization"])
+            gender_badge = get_gender_html(r["gender"])
+            unit_badge = get_unit_html(r["option1"])
+            avg_formatted = f"{r['average']:.2f}"
+
+            table_rows.append(f"""
+            <tr>
+                <td style="color: #64748b; font-weight: 600;">{idx}</td>
+                <td style="font-weight: 700; color: #ffffff;">{r['last_name']} {r['first_name']}</td>
+                <td>{gender_badge}</td>
+                <td><span class="badge-grade">{avg_formatted}</span></td>
+                <td>{spec_badge}</td>
+                <td>{unit_badge}</td>
+            </tr>
+            """)
+
+        table_html = f"""
+        <div class="admin-table-container">
+            <div class="admin-table-header">
+                <div class="admin-table-title">📋 Alegeri detaliate - {selected_session['title']}</div>
+                <div class="admin-table-count">Afișați <b>{len(filtered_records)}</b> elevi</div>
+            </div>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Elev</th>
+                        <th>Gen</th>
+                        <th>Medie</th>
+                        <th>Specializare</th>
+                        <th>Unitate aleasă</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(table_rows)}
+                </tbody>
+            </table>
         </div>
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>Elev</th>
-                    <th>Gen</th>
-                    <th>Medie</th>
-                    <th>Specializare</th>
-                    <th>Unitate aleasă</th>
-                </tr>
-            </thead>
-            <tbody>
-                {"".join(table_rows)}
-            </tbody>
-        </table>
+        """
+        render_html(table_html)
+
+
+# ============================================================
+# TAB 2: CONFIGURARE PROMOȚII & SESIUNI (IMPORT EXCEL)
+# ============================================================
+with tab_config:
+    # ------------------------------------------------------------
+    # Secțiunea 1: Control Sesiune Activă în App
+    # ------------------------------------------------------------
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">🚦 1. Control Sesiune Activă în Aplicația Elevilor (App)</div>
     </div>
-    """
-    render_html(table_html)
+    """)
+
+    if active_session:
+        st.success(f"🟢 În prezent, repartizarea în pagina principală **App** este **DESCHISĂ** pentru sesiunea:\n\n**{active_session['title']}**")
+    else:
+        st.warning("🔒 În prezent, repartizarea în pagina principală **App** este **OPRITĂ**. Elevii nu pot alege opțiuni (pagina este blocată).")
+
+    col_act1, col_act2 = st.columns([3, 2], vertical_alignment="center")
+    with col_act1:
+        sess_to_activate = st.selectbox(
+            "Alege sesiunea pe care dorești să o activezi:",
+            [s["title"] for s in all_sessions],
+            index=default_idx,
+            key="select_session_to_activate"
+        )
+    with col_act2:
+        target_s = next(s for s in all_sessions if s["title"] == sess_to_activate)
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            if st.button("🟢 Deschide în App", use_container_width=True, key="btn_activate_session"):
+                sm.set_active_session(target_s["id"])
+                st.toast(f"Sesiunea «{target_s['title']}» este acum ACTIVĂ în App!")
+                st.rerun()
+        with col_b2:
+            if st.button("⏸️ Oprește Repartizarea", use_container_width=True, key="btn_deactivate_all"):
+                sm.set_active_session(None)
+                st.toast("Repartizarea a fost oprită! Pagina App este acum blocată.")
+                st.rerun()
+
+    st.write("---")
+
+    # ------------------------------------------------------------
+    # Secțiunea 2: Creare Promoție / Sesiune Nouă
+    # ------------------------------------------------------------
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">➕ 2. Adăugare Promoție / Sesiune Nouă de Practică</div>
+    </div>
+    """)
+
+    with st.form("form_create_session"):
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            new_cat = st.radio("Corp Militar / Categorie", ["Maiștri Militari", "Subofițeri"], horizontal=True)
+            new_promo = st.text_input("Promoție (ex: 2024 - 2026 sau 2025 - 2027)", placeholder="2024 - 2026")
+        with col_c2:
+            if new_cat == "Maiștri Militari":
+                new_pract = st.selectbox("Tipul stagiului de practică", ["Practica 1 (Anul 1)", "Practica 2 (Anul 2)"])
+            else:
+                new_pract = st.selectbox("Tipul stagiului de practică", ["Practica 1 (Stagiu unic)"])
+            new_year = st.number_input("Anul calendaristic al stagiului", min_value=2024, max_value=2035, value=2027)
+
+        btn_create = st.form_submit_button("Creează Sesiunea", use_container_width=True)
+        if btn_create:
+            if not new_promo.strip():
+                st.error("Te rugăm să introduci promoția!")
+            else:
+                p_type_clean = "Practica 1" if "1" in new_pract else "Practica 2"
+                created = sm.create_session(new_cat, new_promo.strip(), p_type_clean, int(new_year))
+                st.success(f"Sesiunea a fost creată cu succes: **{created['title']}**!")
+                st.rerun()
+
+    st.write("---")
+
+    # ------------------------------------------------------------
+    # Secțiunea 3: Import Elevi din Excel (Paste sau Upload)
+    # ------------------------------------------------------------
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">👥 3. Import Elevi dintr-un tabel Excel</div>
+        <div class="guide-box">
+            <b>📌 Format coloane așteptat din Excel:</b><br>
+            Tabelul copiat trebuie să conțină coloanele: <code>Nume</code> | <code>Prenume</code> | <code>Specializare</code> | <code>Medie</code> | <code>Gen (B / F)</code>.<br>
+            <i>Poți da Copy direct la celulele dintr-un fișier Excel și Paste mai jos, sau poți încărca fișierul .xlsx / .csv direct.</i>
+        </div>
+    </div>
+    """)
+
+    target_sess_title_students = st.selectbox(
+        "Selectează sesiunea țintă pentru care imporți elevii:",
+        [s["title"] for s in all_sessions],
+        key="target_sess_students"
+    )
+    target_sess_students = next(s for s in all_sessions if s["title"] == target_sess_title_students)
+
+    tab_st_paste, tab_st_file = st.tabs(["📋 Paste din Excel", "📁 Încarcă fișier Excel (.xlsx / .csv)"])
+
+    parsed_students = None
+
+    with tab_st_paste:
+        raw_students_text = st.text_area(
+            "Lipește aici tabelul copiat din Excel (Ctrl+V):",
+            placeholder="Nume\tPrenume\tSpecializare\tMedie\tGen\nPopescu\tVlad\tAparare Cibernetica\t9.50\tB\nIonescu\tMaria\tComunicatii\t9.80\tF",
+            height=180,
+            key="students_paste_area"
+        )
+        if st.button("🔍 Analizează tabelul lipit", key="btn_parse_students_text"):
+            if raw_students_text.strip():
+                parsed_students = sm.parse_students_text(raw_students_text)
+                st.session_state["temp_parsed_students"] = parsed_students
+            else:
+                st.warning("Zona de text este goală.")
+
+    with tab_st_file:
+        uploaded_st_file = st.file_uploader("Încarcă fișierul cu elevi", type=["xlsx", "xls", "csv"], key="st_file_upload")
+        if uploaded_st_file:
+            try:
+                if uploaded_st_file.name.endswith(".csv"):
+                    df_upload = pd.read_csv(uploaded_st_file)
+                else:
+                    df_upload = pd.read_excel(uploaded_st_file)
+                parsed_students = sm.process_students_dataframe(df_upload)
+                st.session_state["temp_parsed_students"] = parsed_students
+            except Exception as e:
+                st.error(f"Eroare la citirea fișierului: {e}")
+
+    # Previzualizare elevi analizați
+    students_to_preview = st.session_state.get("temp_parsed_students", parsed_students)
+    if students_to_preview:
+        st.write(f"### ✅ Previzualizare: {len(students_to_preview)} elevi detectați")
+
+        # Numărătoare băieți / fete
+        count_boys = len([s for s in students_to_preview if s["gender"] == "B"])
+        count_girls = len([s for s in students_to_preview if s["gender"] == "F"])
+        specs_found = set(s["specialization"] for s in students_to_preview)
+
+        st.info(f"**Statistici:** {count_boys} băieți, {count_girls} fete | Specializări detectate: {', '.join(specs_found)}")
+
+        df_preview_st = pd.DataFrame(students_to_preview)[["last_name", "first_name", "specialization", "average", "gender", "username", "password_hash"]]
+        df_preview_st.columns = ["Nume", "Prenume", "Specializare", "Medie", "Gen", "Username Generat", "Parolă Inițială"]
+        st.dataframe(df_preview_st, use_container_width=True)
+
+        if st.button(f"💾 Salvează cei {len(students_to_preview)} elevi în «{target_sess_students['title']}»", type="primary", use_container_width=True):
+            saved_cnt = sm.save_students_for_session(target_sess_students["id"], students_to_preview)
+            st.session_state["temp_parsed_students"] = None
+            st.success(f"🎉 {saved_cnt} elevi au fost salvați și înregistrați cu succes în sesiunea «{target_sess_students['title']}»!")
+            st.rerun()
+
+    st.write("---")
+
+    # ------------------------------------------------------------
+    # Secțiunea 4: Import Unități Militare (UM-uri) din Excel
+    # ------------------------------------------------------------
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">🏢 4. Import Unități Militare (Locuri de Practică)</div>
+        <div class="guide-box">
+            <b>📌 Format coloane așteptat din Excel:</b><br>
+            Tabelul copiat trebuie să conțină coloanele: <code>Unitate</code> (sau Denumire UM) | <code>Specializare</code> | <code>Locuri Băieți</code> | <code>Locuri Fete</code>.<br>
+            <i>Poți da Copy la celulele din Excel și Paste mai jos, sau încarcă fișierul .xlsx / .csv direct.</i>
+        </div>
+    </div>
+    """)
+
+    target_sess_title_units = st.selectbox(
+        "Selectează sesiunea țintă pentru care imporți locurile UM:",
+        [s["title"] for s in all_sessions],
+        key="target_sess_units"
+    )
+    target_sess_units = next(s for s in all_sessions if s["title"] == target_sess_title_units)
+
+    tab_um_paste, tab_um_file = st.tabs(["📋 Paste din Excel", "📁 Încarcă fișier Excel (.xlsx / .csv)"])
+
+    parsed_units = None
+
+    with tab_um_paste:
+        raw_units_text = st.text_area(
+            "Lipește aici tabelul copiat din Excel cu unitățile (Ctrl+V):",
+            placeholder="Unitate\tSpecializare\tLocuri Băieți\tLocuri Fete\nUM 01107 Brasov\tAparare Cibernetica\t2\t1\nUM 02499 Bucuresti\tComunicatii\t3\t2",
+            height=180,
+            key="units_paste_area"
+        )
+        if st.button("🔍 Analizează unitățile lipite", key="btn_parse_units_text"):
+            if raw_units_text.strip():
+                parsed_units = sm.parse_units_text(raw_units_text)
+                st.session_state["temp_parsed_units"] = parsed_units
+            else:
+                st.warning("Zona de text este goală.")
+
+    with tab_um_file:
+        uploaded_um_file = st.file_uploader("Încarcă fișierul cu unități", type=["xlsx", "xls", "csv"], key="um_file_upload")
+        if uploaded_um_file:
+            try:
+                if uploaded_um_file.name.endswith(".csv"):
+                    df_u_upload = pd.read_csv(uploaded_um_file)
+                else:
+                    df_u_upload = pd.read_excel(uploaded_um_file)
+                parsed_units = sm.process_units_dataframe(df_u_upload)
+                st.session_state["temp_parsed_units"] = parsed_units
+            except Exception as e:
+                st.error(f"Eroare la citirea fișierului de unități: {e}")
+
+    units_to_preview = st.session_state.get("temp_parsed_units", parsed_units)
+    if units_to_preview:
+        tot_b = sum(u["boys"] for u in units_to_preview)
+        tot_f = sum(u["girls"] for u in units_to_preview)
+        st.write(f"### ✅ Previzualizare: {len(units_to_preview)} intrări unități detectate")
+        st.info(f"**Total locuri disponibile:** {tot_b + tot_f} ({tot_b} Băieți, {tot_f} Fete)")
+
+        df_u_preview = pd.DataFrame(units_to_preview)
+        df_u_preview.columns = ["Unitate", "Specializare", "Locuri Băieți", "Locuri Fete"]
+        st.dataframe(df_u_preview, use_container_width=True)
+
+        if st.button(f"💾 Salvează unitățile în «{target_sess_units['title']}»", type="primary", use_container_width=True):
+            saved_u = sm.save_units_for_session(target_sess_units["id"], units_to_preview)
+            st.session_state["temp_parsed_units"] = None
+            st.success(f"🎉 {saved_u} unități de practică au fost salvate cu succes în sesiunea «{target_sess_units['title']}»!")
+            st.rerun()
+
+    st.write("---")
+
+    # ------------------------------------------------------------
+    # Secțiunea 5: Listă Sesiuni & Gestiune
+    # ------------------------------------------------------------
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">📂 5. Toate Sesiunile Configurate</div>
+    </div>
+    """)
+
+    sess_summary_rows = []
+    for s in all_sessions:
+        s_id = s["id"]
+        s_elevi = len(sm.get_students_for_session(s_id))
+        s_unitati = len(sm.get_units_for_session(s_id))
+        s_status = "🟢 ACTIVĂ" if s.get("is_active") else "📁 Inactivă"
+
+        sess_summary_rows.append({
+            "ID": s_id,
+            "Denumire": s["title"],
+            "Corp": s["category"],
+            "Promoție": s["promotion"],
+            "Tip Practică": s["practice_type"],
+            "An": s["year"],
+            "Elevi": s_elevi,
+            "Unități": s_unitati,
+            "Stare": s_status
+        })
+
+    st.dataframe(pd.DataFrame(sess_summary_rows), use_container_width=True)
+
+    # Posibilitate de ștergere pentru sesiuni custom
+    deletable_sessions = [s for s in all_sessions if s["id"] != sm.DEFAULT_SESSION_ID]
+    if deletable_sessions:
+        with st.expander("🗑️ Ștergere sesiune"):
+            st.warning("Atenție: Ștergerea unei sesiuni va elimina și elevii, unitățile și alegerile asociate acesteia!")
+            to_delete_title = st.selectbox("Alege sesiunea pe care dorești să o ștergi:", [s["title"] for s in deletable_sessions])
+            to_delete_sess = next(s for s in deletable_sessions if s["title"] == to_delete_title)
+            if st.button(f"Confirmă ștergerea definitivă a sesiunii «{to_delete_sess['title']}»", type="secondary"):
+                sm.delete_session(to_delete_sess["id"])
+                st.toast("Sesiunea a fost ștearsă!")
+                st.rerun()

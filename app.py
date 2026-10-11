@@ -7,27 +7,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-from parser_students import load_students
-from parser_units import load_units
+import sessions_manager as sm
 from student_utils import get_gender
 from choices_manager import save_choice, get_choice
 from students_db import (
     get_student,
     login,
 )
-from supabase_db import (
-    get_all_choices,
-    get_all_students,
-)
 from monitor_utils import normalize_spec
 from ui_utils import render_html
-
-SPECIALIZATION_CODES = {
-    "Aparare Cibernetica": "AC",
-    "Securitate Militara": "SM",
-    "Comunicatii": "COM",
-    "Tehnologia Informatiei": "TI",
-}
 
 
 def load_app_css() -> None:
@@ -140,16 +128,8 @@ def init_session_state() -> None:
         st.session_state["authenticated"] = False
     if "student_id" not in st.session_state:
         st.session_state["student_id"] = None
-
-
-def make_student_id(specializare: str, last_name: str, first_name: str) -> str:
-    return (
-        SPECIALIZATION_CODES[specializare]
-        + "_"
-        + last_name.replace(" ", "_")
-        + "_"
-        + first_name.replace(" ", "_")
-    )
+    if "active_session_id" not in st.session_state:
+        st.session_state["active_session_id"] = None
 
 
 def render_logout_header(student_record: dict) -> None:
@@ -170,10 +150,11 @@ def render_logout_header(student_record: dict) -> None:
         if st.button("Logout", use_container_width=True):
             st.session_state["authenticated"] = False
             st.session_state["student_id"] = None
+            st.session_state["active_session_id"] = None
             st.rerun()
 
 
-def render_options(student_record: dict, units: dict) -> None:
+def render_options(student_record: dict, units: dict, active_session_id: str) -> None:
     student_id = student_record["id"]
     specializare = student_record["specialization"]
     last_name = student_record["last_name"]
@@ -188,9 +169,9 @@ def render_options(student_record: dict, units: dict) -> None:
 
     st.subheader("Selectare unitate de practică")
 
-    # Calculăm în timp real locurile ocupate de ALȚI elevi
-    all_choices = get_all_choices()
-    all_students = get_all_students()
+    # Calculăm în timp real locurile ocupate de ALȚI elevi din sesiunea curentă
+    all_choices = sm.get_choices_for_session(active_session_id)
+    all_students = sm.get_students_for_session(active_session_id)
     students_map = {s["id"]: s for s in all_students}
 
     norm_spec = normalize_spec(specializare)
@@ -296,16 +277,54 @@ def render_options(student_record: dict, units: dict) -> None:
 init_session_state()
 load_app_css()
 
-students = load_students()
-units = load_units()
-
 st.title("🎓 Repartizare practică")
 st.caption("Sistem de simulare și alocare a stagiilor de practică")
+
+active_session = sm.get_active_session()
+
+# Verificăm dacă există o sesiune activă deschisă pentru selecție
+if not active_session:
+    render_html("""
+<div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 14px; padding: 28px 20px; text-align: center; margin-top: 20px;">
+    <div style="font-size: 2.2rem; margin-bottom: 12px;">🔒</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: #f87171; margin-bottom: 8px;">Repartizarea este în prezent OPRITĂ</div>
+    <div style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; max-width: 480px; margin: 0 auto;">
+        Nicio sesiune de repartiție nu este activă în acest moment pentru alegerea opțiunilor de către elevi.<br><br>
+        Puteți consulta situația alocărilor și arhiva opțiunilor accesând pagina 
+        <strong style="color: #60a5fa;">„Situatia in timp real”</strong> din meniul lateral.
+    </div>
+</div>
+""")
+    st.stop()
+
+# Banner sesiune activă
+render_html(f"""
+<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+    <div>
+        <span style="color: #6ee7b7; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">🟢 Sesiune Deschisă</span>
+        <div style="color: #ffffff; font-weight: 700; font-size: 1.05rem; margin-top: 2px;">{active_session.get('title', active_session.get('name', 'Sesiune activă'))}</div>
+    </div>
+    <span style="background: rgba(16, 185, 129, 0.2); color: #a7f3d0; font-size: 0.8rem; padding: 4px 10px; border-radius: 16px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
+        {active_session.get('category', 'MM')} • {active_session.get('practice_type', '')} ({active_session.get('year', '')})
+    </span>
+</div>
+""")
+
+active_session_id = active_session["id"]
+session_students = sm.get_students_for_session(active_session_id)
+session_units = sm.get_session_units_dict(active_session_id)
 
 # ============================================================
 # Already authenticated: hide login entirely
 # ============================================================
 if st.session_state["authenticated"]:
+    # Dacă sesiunea activă s-a schimbat între timp, resetăm autentificarea
+    if st.session_state.get("active_session_id") != active_session_id:
+        st.session_state["authenticated"] = False
+        st.session_state["student_id"] = None
+        st.session_state["active_session_id"] = active_session_id
+        st.rerun()
+
     student_id = st.session_state.get("student_id")
 
     if not student_id:
@@ -316,60 +335,59 @@ if st.session_state["authenticated"]:
     student_record = get_student(student_id)
 
     if not student_record:
-        st.error("Contul tau nu a fost gasit in baza de date. Te delogam.")
+        st.error("Contul tău nu a fost găsit în baza de date. Te delogăm.")
         st.session_state["authenticated"] = False
         st.session_state["student_id"] = None
         st.rerun()
 
     render_logout_header(student_record)
-    render_options(student_record, units)
+    render_options(student_record, session_units, active_session_id)
 
 # ============================================================
-# Not authenticated: create account / login
+# Not authenticated: autentificare elev
 # ============================================================
 else:
+    if not session_students:
+        st.info("⚠️ Nu există elevi înregistrați pentru această sesiune de practică.")
+        st.stop()
+
+    # Grupăm elevii pe specializări
+    students_by_spec = {}
+    for s in session_students:
+        spec_name = s.get("specialization", "General")
+        if spec_name not in students_by_spec:
+            students_by_spec[spec_name] = []
+        students_by_spec[spec_name].append(s)
+
+    for spec_name in students_by_spec:
+        students_by_spec[spec_name].sort(key=lambda x: x.get("average", 0.0), reverse=True)
+
     specializare = st.selectbox(
-        "Selecteaza specializarea",
-        list(students.keys()),
-        format_func=lambda s: f"{s} ({len(students[s])} elevi)",
+        "Selectează specializarea",
+        list(students_by_spec.keys()),
+        format_func=lambda s: f"{s} ({len(students_by_spec[s])} elevi)",
     )
 
-    elevi = students[specializare]
+    elevi = students_by_spec[specializare]
 
-    nume_afisate = [
-        f"{prenume} {nume} ({medie})"
-        for nume, prenume, medie in elevi
-    ]
+    student_options_map = {
+        f"{s['first_name']} {s['last_name']} ({s['average']:.2f})": s
+        for s in elevi
+    }
 
     elev_selectat = st.selectbox(
-        "Selecteaza numele",
-        nume_afisate,
+        "Selectează numele",
+        list(student_options_map.keys()),
     )
+
+    student_record = student_options_map[elev_selectat]
+    student_id = student_record["id"]
 
     st.success(f"Ai selectat: {elev_selectat}")
 
-    selected_student = None
-    for nume, prenume, medie in elevi:
-        if f"{prenume} {nume} ({medie})" == elev_selectat:
-            selected_student = (nume, prenume, medie)
-            break
-
-    if selected_student is None:
-        st.error("Elevul selectat nu a fost gasit.")
-        st.stop()
-
-    last_name, first_name, average = selected_student
-
-    student_id = make_student_id(specializare, last_name, first_name)
-    student_record = get_student(student_id)
-
-    if not student_record:
-        st.error("Elevul nu exista in baza de date students.")
-        st.stop()
-
     username = (
         student_record.get("username")
-        or f"{last_name.lower().strip()}.{first_name.lower().strip()}"
+        or f"{student_record['last_name'].lower().strip()}.{student_record['first_name'].lower().strip()}"
     )
 
     st.subheader("Autentificare")
@@ -377,7 +395,7 @@ else:
 
     with st.form(key=f"{student_id}_login_form"):
         password = st.text_input(
-            "Parola (ultimele 6 cifre din CNP)",
+            "Parola (implicit: 123456 sau ultimele 6 cifre CNP)",
             type="password",
             key=f"{student_id}_login_password",
         )
@@ -390,7 +408,8 @@ else:
             ):
                 st.session_state["authenticated"] = True
                 st.session_state["student_id"] = student_id
-                st.toast("Autentificat.")
+                st.session_state["active_session_id"] = active_session_id
+                st.toast("Autentificat cu succes!")
                 st.rerun()
             else:
                 st.error("Parolă incorectă.")

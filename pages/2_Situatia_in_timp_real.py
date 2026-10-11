@@ -1,11 +1,7 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-from supabase_db import (
-    get_all_students,
-    get_all_choices,
-    get_all_units
-)
+import sessions_manager as sm
 
 from monitor_utils import (
     build_monitor
@@ -47,17 +43,51 @@ render_html("""
 """)
 
 #
-# Date
+# Sesiune de practică / Promoție
 #
-students = get_all_students()
-choices = get_all_choices()
-units = get_all_units()
+all_sessions = sm.get_all_sessions()
+active_session = sm.get_active_session()
+
+default_sess_idx = 0
+if active_session:
+    for idx, s in enumerate(all_sessions):
+        if s["id"] == active_session["id"]:
+            default_sess_idx = idx
+            break
+
+col_s1, col_s2 = st.columns([4, 1.5], vertical_alignment="center")
+with col_s1:
+    session_title = st.selectbox(
+        "Sesiune de practică / Promoție:",
+        [s["title"] for s in all_sessions],
+        index=default_sess_idx,
+        key="live_monitor_session_select"
+    )
+
+selected_session = next((s for s in all_sessions if s["title"] == session_title), all_sessions[0])
+
+with col_s2:
+    if selected_session.get("is_active"):
+        render_html('<div style="margin-top: 25px;"><span class="status-active-badge">🟢 În direct (Live)</span></div>')
+    else:
+        render_html('<div style="margin-top: 25px;"><span class="status-inactive-badge">📁 Consultare arhivă</span></div>')
+
+#
+# Date pentru sesiunea selectată
+#
+students = sm.get_students_for_session(selected_session["id"])
+choices = sm.get_choices_for_session(selected_session["id"])
+units = sm.get_units_for_session(selected_session["id"])
 
 monitor = build_monitor(
     students,
     choices,
     units
 )
+
+if not monitor:
+    st.info(f"Nu există încă unități de practică configurate pentru sesiunea «{selected_session['title']}». Administratorul poate adăuga unități din Panoul Admin.")
+    st.stop()
 
 #
 # Filtre superioare
