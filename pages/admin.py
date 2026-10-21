@@ -745,9 +745,10 @@ with tab_config:
     <div class="config-section-card">
         <div class="config-section-title">🏢 4. Import Unități Militare (Locuri de Practică)</div>
         <div class="guide-box">
-            <b>📌 Format coloane așteptat din Excel:</b><br>
-            Tabelul copiat trebuie să conțină coloanele: <code>Unitate</code> (sau Denumire UM) | <code>Specializare</code> | <code>Locuri Băieți</code> | <code>Locuri Fete</code>.<br>
-            <i>Poți da Copy la celulele din Excel și Paste mai jos, sau încarcă fișierul .xlsx / .csv direct.</i>
+            <b>📌 Formate acceptate din Excel:</b><br>
+            • <b>Documentul oficial MApN:</b> fișierul original tipizat cu celule îmbinate (Unitatea militară, Specialitatea militară, Total, Băieți [B], Fete [F]).<br>
+            • <b>Format tabelar simplu:</b> <code>Unitate</code> | <code>Specializare</code> | <code>Locuri Băieți</code> | <code>Locuri Fete</code>.<br>
+            <i>Poți încărca fișierul .xlsx / .csv direct sau poți folosi Copy-Paste la celule în tab-ul alăturat.</i>
         </div>
     </div>
     """)

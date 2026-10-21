@@ -442,6 +442,32 @@ def process_students_dataframe(df: pd.DataFrame) -> list[dict]:
     return students
 
 
+def clean_unit_name_str(val: str) -> str:
+    s = str(val).strip()
+    s = re.sub(r"[\r\n]+", " ", s)
+    s = re.sub(r"u\.?\s*m\.?", "UM", s, flags=re.IGNORECASE)
+    for c, r in [("ă", "a"), ("â", "a"), ("î", "i"), ("ș", "s"), ("ş", "s"), ("ț", "t"), ("ţ", "t")]:
+        s = s.replace(c, r)
+    s = re.sub(r"\s+", " ", s).strip()
+    if s.upper().startswith("UM "):
+        s = "UM_" + s[3:].strip()
+    elif not s.upper().startswith("UM_"):
+        s = "UM_" + s
+    return s
+
+
+def parse_capacity_int(val) -> int:
+    if val is None or pd.isna(val):
+        return 0
+    s = str(val).strip()
+    if s in ["-", "–", "—", "", "nan", "None"]:
+        return 0
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return 0
+
+
 def parse_units_text(raw_text: str) -> list[dict]:
     """Parsează text copiat din Excel cu unități militare."""
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -459,16 +485,23 @@ def parse_units_text(raw_text: str) -> list[dict]:
         sep = r"\s{2,}"
 
     import io
-    df = pd.read_csv(io.StringIO(raw_text), sep=sep, engine="python")
+    try:
+        df = pd.read_csv(io.StringIO(raw_text), sep=sep, engine="python")
+    except Exception:
+        df = pd.read_csv(io.StringIO(raw_text), sep=sep, engine="python", header=None)
     return process_units_dataframe(df)
 
 
 def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
-    """Extrage și normalizează unitățile dintr-un DataFrame."""
+    """Extrage și normalizează unitățile dintr-un DataFrame (suportă atât format tabelar simplu, cât și matricea oficială MApN cu celule îmbinate)."""
+    if df.empty:
+        return []
+
+    # 1. Verificare format tabelar simplu (Coloane: Unitate, Specializare, Băieți, Fete)
     col_map = {}
     for col in df.columns:
         c_clean = clean_header_name(str(col))
-        if any(w in c_clean for w in ["unitate", "um", "denumire"]):
+        if any(w in c_clean for w in ["unitate", "denumire um", "nume um"]):
             col_map["unit_name"] = col
         elif any(w in c_clean for w in ["specializ", "spec", "profil", "arma"]):
             col_map["specialization"] = col
@@ -477,26 +510,120 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
         elif any(w in c_clean for w in ["fete", "femei", "locuri f", "locuri_f", "nr f"]) or c_clean == "f":
             col_map["girls"] = col
 
-    units = []
-    for _, row in df.iterrows():
-        unit_name = str(row.get(col_map.get("unit_name", ""), "")).strip()
-        if not unit_name or unit_name.lower() == "nan":
+    if "unit_name" in col_map and "specialization" in col_map and ("boys" in col_map or "girls" in col_map):
+        units = []
+        for _, row in df.iterrows():
+            unit_name = str(row.get(col_map.get("unit_name", ""), "")).strip()
+            if not unit_name or unit_name.lower() == "nan":
+                continue
+
+            spec = normalize_spec(str(row.get(col_map.get("specialization", ""), "Aparare Cibernetica")))
+            boys = parse_capacity_int(row.get(col_map.get("boys", 0), 0))
+            girls = parse_capacity_int(row.get(col_map.get("girls", 0), 0))
+
+            if boys <= 0 and girls <= 0:
+                continue
+
+            clean_name = clean_unit_name_str(unit_name)
+            units.append({
+                "unit_name": clean_name,
+                "specialization": spec,
+                "boys": boys,
+                "girls": girls
+            })
+        if units:
+            return units
+
+    # 2. Formatul oficial MApN cu antet extins pe mai multe rânduri și celule îmbinate (merged cells)
+    unit_col = None
+    spec_col = None
+    b_col = None
+    f_col = None
+    data_start_row = 0
+
+    # Căutăm antetul în primele 10 rânduri
+    for r_idx in range(min(10, len(df))):
+        row_vals = [clean_header_name(str(df.iloc[r_idx, c_idx])) for c_idx in range(len(df.columns))]
+        for c_idx, val in enumerate(row_vals):
+            if val in ["b", "baieti", "barbati"]:
+                b_col = c_idx
+                data_start_row = max(data_start_row, r_idx + 1)
+            elif val in ["f", "fete", "femei"]:
+                f_col = c_idx
+                data_start_row = max(data_start_row, r_idx + 1)
+            elif any(k in val for k in ["specialitate", "specializ"]):
+                spec_col = c_idx
+                data_start_row = max(data_start_row, r_idx + 1)
+            elif any(k in val for k in ["unitate", "u.m.", "denumire"]):
+                unit_col = c_idx
+
+    # Dacă unit_col sau spec_col nu au fost găsite în textul antetului, le detectăm din conținut
+    if unit_col is None:
+        for c_idx in range(len(df.columns)):
+            col_sample = [str(v) for v in df.iloc[data_start_row:data_start_row+15, c_idx] if pd.notna(v)]
+            if any("u.m" in v.lower() or "um" in v.lower() for v in col_sample):
+                unit_col = c_idx
+                break
+        if unit_col is None:
+            unit_col = 0
+
+    if spec_col is None:
+        for c_idx in range(len(df.columns)):
+            col_sample = [clean_header_name(str(v)) for v in df.iloc[data_start_row:data_start_row+15, c_idx] if pd.notna(v)]
+            if any(any(k in v for k in ["comunic", "teh", "ciber", "securit"]) for v in col_sample):
+                spec_col = c_idx
+                break
+
+    if spec_col is None:
+        return []
+
+    # Verificăm dacă coloana adiacentă de după unitate (ex: Col B) conține orașul/arma (ex: București SMFT)
+    has_adjacent_unit_text = False
+    if unit_col is not None and unit_col + 1 < spec_col:
+        adj_sample = [str(v) for v in df.iloc[data_start_row:data_start_row+15, unit_col + 1] if pd.notna(v)]
+        if any(any(k in v.upper() for k in ["SMFT", "SMFA", "CCI", "CLI", "CAPC", "BUCURESTI", "BACAU", "CLUJ", "BRASOV"]) for v in adj_sample):
+            has_adjacent_unit_text = True
+
+    # Pre-procesăm seria de unități cu ffill() pentru celulele îmbinate (merged cells)
+    unit_names_list = []
+    current_unit = ""
+    for idx in range(len(df)):
+        if idx < data_start_row:
+            unit_names_list.append("")
             continue
 
-        spec = normalize_spec(str(row.get(col_map.get("specialization", ""), "Aparare Cibernetica")))
+        raw_val = df.iloc[idx, unit_col]
+        if pd.notna(raw_val) and str(raw_val).strip() and str(raw_val).strip().lower() not in ["nan", "none"]:
+            val_text = str(raw_val).strip()
+            if has_adjacent_unit_text:
+                adj_val = df.iloc[idx, unit_col + 1]
+                if pd.notna(adj_val) and str(adj_val).strip() and str(adj_val).strip().lower() not in ["nan", "none"]:
+                    val_text = f"{val_text} {str(adj_val).strip()}"
+            current_unit = val_text
+        unit_names_list.append(current_unit)
 
-        try:
-            boys = int(float(str(row.get(col_map.get("boys", 0), 0)).strip() or 0))
-        except (ValueError, TypeError):
-            boys = 0
+    units = []
+    for idx in range(data_start_row, len(df)):
+        raw_unit = unit_names_list[idx]
+        if not raw_unit:
+            continue
 
-        try:
-            girls = int(float(str(row.get(col_map.get("girls", 0), 0)).strip() or 0))
-        except (ValueError, TypeError):
-            girls = 0
+        raw_spec = df.iloc[idx, spec_col]
+        if pd.isna(raw_spec) or not str(raw_spec).strip() or str(raw_spec).strip().lower() in ["nan", "none"]:
+            continue
 
-        clean_name = unit_name.replace(" ", "_") if not unit_name.startswith("UM_") else unit_name
+        spec = normalize_spec(str(raw_spec))
+        if spec not in ["Tehnologia Informatiei", "Aparare Cibernetica", "Securitate Militara", "Comunicatii"]:
+            continue
 
+        boys = parse_capacity_int(df.iloc[idx, b_col]) if b_col is not None else 0
+        girls = parse_capacity_int(df.iloc[idx, f_col]) if f_col is not None else 0
+
+        # Păstrăm doar unitățile care au locuri disponibile (băieți sau fete)
+        if boys <= 0 and girls <= 0:
+            continue
+
+        clean_name = clean_unit_name_str(raw_unit)
         units.append({
             "unit_name": clean_name,
             "specialization": spec,
