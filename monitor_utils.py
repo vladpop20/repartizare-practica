@@ -84,26 +84,34 @@ def build_monitor(
 
             continue
 
-        unit_name = choice.get("option1")
+        raw_unit_name = choice.get("option1")
+        if not raw_unit_name:
+            continue
 
-        if not unit_name or unit_name not in monitor[specialization]:
+        target_unit = None
+        if raw_unit_name in monitor[specialization]:
+            target_unit = raw_unit_name
+        else:
+            canonical_u = raw_unit_name.replace("UM ", "UM_")
+            display_u = raw_unit_name.replace("UM_", "UM ")
+            if canonical_u in monitor[specialization]:
+                target_unit = canonical_u
+            elif display_u in monitor[specialization]:
+                target_unit = display_u
 
+        if not target_unit:
             continue
 
         gender = (
-
             "boys"
-
             if student["gender"] == "B"
-
             else "girls"
-
         )
 
         monitor[
             specialization
         ][
-            unit_name
+            target_unit
         ][
             "option1"
         ][

@@ -640,7 +640,7 @@ with tab_config:
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             new_cat = st.radio("Corp Militar / Categorie", ["Maiștri Militari", "Subofițeri"], horizontal=True)
-            new_promo = st.text_input("Promoție (ex: 2024 - 2026 sau 2025 - 2027)", placeholder="2024 - 2026")
+            new_promo = st.text_input("Promoție (ex: 2025 - 2027 sau 2026 - 2028)", placeholder="2025 - 2027")
         with col_c2:
             if new_cat == "Maiștri Militari":
                 new_pract = st.selectbox("Tipul stagiului de practică", ["Practica 1 (Anul 1)", "Practica 2 (Anul 2)"])

@@ -5,19 +5,24 @@ import pandas as pd
 from supabase_client import supabase
 from monitor_utils import normalize_spec
 
-DEFAULT_SESSION_ID = "mm_2024_2026_p1"
+DEFAULT_SESSION_ID = "mm_2025_2027_p1"
 
 DEFAULT_SESSION = {
     "id": DEFAULT_SESSION_ID,
-    "name": "Maiștri Militari - Promoția 2024-2026 - Practica 1 (2026)",
+    "name": "Maiștri Militari - Promoția 2025-2027 - Practica 1 (2026)",
     "category": "Maiștri Militari",
-    "promotion": "2024 - 2026",
+    "promotion": "2025-2027",
     "practice_type": "Practica 1",
     "year": 2026,
-    "title": "Maiștri Militari - Promoția 2024-2026 - Practica 1 (2026)",
+    "title": "Maiștri Militari - Promoția 2025-2027 - Practica 1 (2026)",
     "is_active": True,
     "created_at": "2026-06-24T12:00:00Z"
 }
+
+
+def is_default_session(session_id: str | None) -> bool:
+    """Verifică dacă ID-ul reprezintă sesiunea de bază (fără prefixe în BD)."""
+    return session_id in (DEFAULT_SESSION_ID, "mm_2024_2026_p1", None)
 
 
 def _read_config(key: str, default=None):
@@ -52,10 +57,22 @@ def _write_config(key: str, data) -> bool:
 
 
 def get_all_sessions() -> list[dict]:
-    """Returnează lista tuturor sesiunilor configurate."""
+    """Returnează lista tuturor sesiunilor configurate, migrând automat la Promoția 2025-2027 dacă este necesar."""
     sessions = _read_config("__APP_CONFIG_SESSIONS__")
+    updated = False
     if not sessions:
         sessions = [DEFAULT_SESSION]
+        updated = True
+    else:
+        for s in sessions:
+            if s.get("id") in ("mm_2024_2026_p1", DEFAULT_SESSION_ID):
+                if s.get("promotion") != "2025-2027" or "2024-2026" in s.get("title", ""):
+                    s["id"] = DEFAULT_SESSION_ID
+                    s["promotion"] = "2025-2027"
+                    s["name"] = "Maiștri Militari - Promoția 2025-2027 - Practica 1 (2026)"
+                    s["title"] = "Maiștri Militari - Promoția 2025-2027 - Practica 1 (2026)"
+                    updated = True
+    if updated:
         _write_config("__APP_CONFIG_SESSIONS__", sessions)
     return sessions
 
@@ -124,7 +141,7 @@ def create_session(category: str, promotion: str, practice_type: str, year: int)
 
 def delete_session(session_id: str) -> bool:
     """Șterge o sesiune (sesiunea implicită inițială nu poate fi ștearsă)."""
-    if session_id == DEFAULT_SESSION_ID:
+    if is_default_session(session_id):
         return False
     sessions = get_all_sessions()
     sessions = [s for s in sessions if s["id"] != session_id]
@@ -150,7 +167,7 @@ def delete_session(session_id: str) -> bool:
 # ============================================================
 def get_students_for_session(session_id: str) -> list[dict]:
     """Returnează elevii pentru o sesiune specificată."""
-    if session_id == DEFAULT_SESSION_ID:
+    if is_default_session(session_id):
         # Sesiunea implicită folosește elevii fără prefix
         res = supabase.table("students").select("*").execute()
         students = [s for s in (res.data or []) if "__" not in s["id"]]
@@ -177,7 +194,7 @@ def save_students_for_session(session_id: str, new_students: list[dict]) -> int:
     records = []
     for s in new_students:
         raw_id = s.get("id")
-        if session_id != DEFAULT_SESSION_ID:
+        if not is_default_session(session_id):
             s_id = f"{session_id}__{raw_id}" if not raw_id.startswith(f"{session_id}__") else raw_id
             spec_val = f"{session_id}__{normalize_spec(s.get('specialization', ''))}"
         else:
@@ -196,7 +213,7 @@ def save_students_for_session(session_id: str, new_students: list[dict]) -> int:
         })
 
     # Ștergem eventualii elevi vechi ai sesiunii pentru reîncărcare curată dacă nu e default
-    if session_id != DEFAULT_SESSION_ID:
+    if not is_default_session(session_id):
         supabase.table("students").delete().like("id", f"{session_id}__%").execute()
 
     # Inserăm în batch-uri de 50
@@ -218,7 +235,7 @@ def save_students_for_session(session_id: str, new_students: list[dict]) -> int:
 # ============================================================
 def get_units_for_session(session_id: str) -> list[dict]:
     """Returnează unitățile de practică pentru o sesiune specificată."""
-    if session_id == DEFAULT_SESSION_ID:
+    if is_default_session(session_id):
         res = supabase.table("units").select("*").execute()
         units = [u for u in (res.data or []) if "__" not in u.get("specialization", "")]
         return units
@@ -243,7 +260,7 @@ def save_units_for_session(session_id: str, new_units: list[dict]) -> int:
     records = []
     for u in new_units:
         raw_spec = normalize_spec(u.get("specialization", ""))
-        spec_val = f"{session_id}__{raw_spec}" if session_id != DEFAULT_SESSION_ID else raw_spec
+        spec_val = f"{session_id}__{raw_spec}" if not is_default_session(session_id) else raw_spec
 
         records.append({
             "specialization": spec_val,
@@ -252,7 +269,7 @@ def save_units_for_session(session_id: str, new_units: list[dict]) -> int:
             "girls": int(u.get("girls", 0))
         })
 
-    if session_id != DEFAULT_SESSION_ID:
+    if not is_default_session(session_id):
         supabase.table("units").delete().like("specialization", f"{session_id}__%").execute()
 
     inserted = 0
@@ -271,7 +288,7 @@ def save_units_for_session(session_id: str, new_units: list[dict]) -> int:
 # ============================================================
 def get_choices_for_session(session_id: str) -> list[dict]:
     """Returnează alegerile salvate pentru o sesiune."""
-    if session_id == DEFAULT_SESSION_ID:
+    if is_default_session(session_id):
         res = supabase.table("choices").select("*").execute()
         choices = [c for c in (res.data or []) if "__" not in c.get("student_id", "")]
         return choices

@@ -166,6 +166,9 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
     )
 
     saved_choice = get_choice(student_id)
+    saved_canonical = None
+    if saved_choice and saved_choice.get("option1"):
+        saved_canonical = saved_choice["option1"].strip().replace("UM ", "UM_")
 
     st.subheader("Selectare unitate de practică")
 
@@ -191,7 +194,8 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
             normalize_spec(other_student.get("specialization", "")) == norm_spec
             and other_student.get("gender") == gender
         ):
-            occupied_spots[chosen_unit] = occupied_spots.get(chosen_unit, 0) + 1
+            canonical_chosen = chosen_unit.strip().replace("UM ", "UM_")
+            occupied_spots[canonical_chosen] = occupied_spots.get(canonical_chosen, 0) + 1
 
     # Găsim unitățile pentru specializarea curentă
     spec_units = []
@@ -204,35 +208,37 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
     remaining_spots = {}
 
     for unit in spec_units:
-        unit_name = unit.get("display", unit.get("unit_name", ""))
-        if not unit_name:
+        raw_unit_name = unit.get("unit_name", "")
+        if not raw_unit_name:
             continue
+        canonical_unit_name = raw_unit_name.strip().replace("UM ", "UM_")
 
         if gender == "B":
             capacity = unit.get("boys", 0)
             if capacity <= 0:
                 continue  # Nu are locuri alocate pentru băieți
-            occupied = occupied_spots.get(unit_name, 0)
+            occupied = occupied_spots.get(canonical_unit_name, 0)
             rem = capacity - occupied
             if rem > 0:
                 available_units.append(unit)
-                remaining_spots[unit_name] = rem
+                remaining_spots[canonical_unit_name] = rem
         elif gender == "F":
             capacity = unit.get("girls", 0)
             if capacity <= 0:
                 continue  # Nu are locuri alocate pentru fete
-            occupied = occupied_spots.get(unit_name, 0)
+            occupied = occupied_spots.get(canonical_unit_name, 0)
             rem = capacity - occupied
             if rem > 0:
                 available_units.append(unit)
-                remaining_spots[unit_name] = rem
+                remaining_spots[canonical_unit_name] = rem
 
-    if saved_choice and saved_choice.get("option1"):
+    if saved_canonical:
+        disp_saved = saved_canonical.replace("UM_", "UM ")
         render_html(
             f"""
 <div class="saved-choice-banner">
     <div class="saved-choice-label">Opțiunea ta salvată în prezent</div>
-    <div class="saved-choice-val">✅ {saved_choice['option1']}</div>
+    <div class="saved-choice-val">✅ {disp_saved}</div>
 </div>
 """
         )
@@ -241,31 +247,35 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
         st.warning("Nu mai există locuri disponibile pentru profilul tău.")
         return
 
-    unit_names = [
-        unit.get("display", unit.get("unit_name", ""))
+    unit_canonical_keys = [
+        unit.get("unit_name", "").strip().replace("UM ", "UM_")
         for unit in available_units
     ]
 
     default_index = 0
-    if saved_choice and saved_choice.get("option1") in unit_names:
-        default_index = unit_names.index(saved_choice["option1"])
+    if saved_canonical and saved_canonical in unit_canonical_keys:
+        default_index = unit_canonical_keys.index(saved_canonical)
 
-    selected_unit = st.selectbox(
+    def format_unit_label(u_key: str) -> str:
+        disp = u_key.replace("UM_", "UM ")
+        rem = remaining_spots.get(u_key, 0)
+        if rem == 1:
+            return f"{disp} (1 loc disponibil)"
+        else:
+            return f"{disp} ({rem} locuri disponibile)"
+
+    selected_canonical = st.selectbox(
         "Alege unitatea dorită",
-        unit_names,
+        unit_canonical_keys,
         index=default_index,
-        format_func=lambda u: (
-            f"{u} ({remaining_spots.get(u, 1)} loc disponibil)"
-            if remaining_spots.get(u, 1) == 1
-            else f"{u} ({remaining_spots.get(u, 1)} locuri disponibile)"
-        ),
+        format_func=format_unit_label,
         key=f"{student_id}_selected_unit",
     )
 
     if st.button("Salvează opțiunea", key=f"{student_id}_save_choice", use_container_width=True):
         save_choice(
             student_id,
-            selected_unit,
+            selected_canonical,
         )
         st.toast("Opțiunea a fost salvată cu succes!")
         st.rerun()
