@@ -333,33 +333,56 @@ def process_students_dataframe(df: pd.DataFrame) -> list[dict]:
     col_map = {}
     for col in df.columns:
         c_clean = clean_header_name(str(col))
-        if any(w in c_clean for w in ["last_name", "nume_familie", "nume"]) and "prenume" not in c_clean and "complet" not in c_clean:
-            col_map["last_name"] = col
+        # 1. Coloană combinată (Nume Prenume / Nume Complet / Elev)
+        if any(w in c_clean for w in [
+            "nume prenume", "nume_prenume", "nume si prenume", "nume_si_prenume",
+            "nume complet", "nume_complet", "elev", "student"
+        ]):
+            col_map["full_name"] = col
+        # 2. Doar prenume
         elif any(w in c_clean for w in ["first_name", "prenume"]):
             col_map["first_name"] = col
-        elif any(w in c_clean for w in ["nume_complet", "nume si prenume", "elev"]):
-            col_map["full_name"] = col
-        elif any(w in c_clean for w in ["medie", "average", "nota"]):
+        # 3. Doar nume de familie
+        elif any(w in c_clean for w in ["last_name", "nume_familie", "nume"]):
+            col_map["last_name"] = col
+        # 4. Medie
+        elif any(w in c_clean for w in ["medie", "average", "nota", "media"]):
             col_map["average"] = col
-        elif any(w in c_clean for w in ["specializ", "spec", "profil"]):
+        # 5. Specializare
+        elif any(w in c_clean for w in ["specializ", "spec", "profil", "arma"]):
             col_map["specialization"] = col
+        # 6. Gen
         elif any(w in c_clean for w in ["gen", "sex"]):
             col_map["gender"] = col
+        # 7. Username
         elif any(w in c_clean for w in ["user", "username", "cont"]):
             col_map["username"] = col
 
     students = []
     used_usernames = set()
 
+    spec_code_map = {
+        "Tehnologia Informatiei": "TI",
+        "Aparare Cibernetica": "AC",
+        "Securitate Militara": "SM",
+        "Comunicatii": "COM"
+    }
+
     for _, row in df.iterrows():
         # Nume / Prenume
-        if "last_name" in col_map and "first_name" in col_map:
+        if "full_name" in col_map:
+            val = str(row[col_map["full_name"]]).strip()
+            parts = val.split(" ", 1)
+            last_name = parts[0].strip()
+            first_name = parts[1].strip() if len(parts) > 1 else ""
+        elif "last_name" in col_map and "first_name" in col_map:
             last_name = str(row[col_map["last_name"]]).strip()
             first_name = str(row[col_map["first_name"]]).strip()
-        elif "full_name" in col_map:
-            parts = str(row[col_map["full_name"]]).strip().split(" ", 1)
-            last_name = parts[0]
-            first_name = parts[1] if len(parts) > 1 else ""
+        elif "last_name" in col_map:
+            val = str(row[col_map["last_name"]]).strip()
+            parts = val.split(" ", 1)
+            last_name = parts[0].strip()
+            first_name = parts[1].strip() if len(parts) > 1 else ""
         else:
             continue
 
@@ -374,7 +397,8 @@ def process_students_dataframe(df: pd.DataFrame) -> list[dict]:
             average = 0.0
 
         # Specializare
-        spec = normalize_spec(str(row.get(col_map.get("specialization", ""), "Aparare Cibernetica")))
+        raw_spec = str(row.get(col_map.get("specialization", ""), "Aparare Cibernetica"))
+        spec = normalize_spec(raw_spec)
 
         # Gen
         raw_gender = str(row.get(col_map.get("gender", "B"))).strip().upper()
@@ -398,9 +422,11 @@ def process_students_dataframe(df: pd.DataFrame) -> list[dict]:
             idx += 1
         used_usernames.add(username)
 
-        # ID elev
-        spec_prefix = "".join([w[0] for w in spec.split()]).upper()
-        s_id = f"{spec_prefix}_{last_name.replace(' ', '_')}_{first_name.replace(' ', '_')}"
+        # ID elev (folosim codurile canonice AC, TI, SM, COM)
+        spec_prefix = spec_code_map.get(spec, "".join([w[0] for w in spec.split()]).upper())
+        clean_id_l = re.sub(r"[^\w]", "", clean_header_name(last_name)).capitalize()
+        clean_id_f = re.sub(r"[^\w]", "", clean_header_name(first_name.split()[0] if first_name else "")).capitalize()
+        s_id = f"{spec_prefix}_{clean_id_l}_{clean_id_f}"
 
         students.append({
             "id": s_id,
@@ -444,11 +470,11 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
         c_clean = clean_header_name(str(col))
         if any(w in c_clean for w in ["unitate", "um", "denumire"]):
             col_map["unit_name"] = col
-        elif any(w in c_clean for w in ["specializ", "spec"]):
+        elif any(w in c_clean for w in ["specializ", "spec", "profil", "arma"]):
             col_map["specialization"] = col
-        elif any(w in c_clean for w in ["baieti", "barbati", "b"]):
+        elif any(w in c_clean for w in ["baieti", "barbati", "locuri b", "locuri_b", "nr b"]) or c_clean == "b":
             col_map["boys"] = col
-        elif any(w in c_clean for w in ["fete", "femei", "f"]):
+        elif any(w in c_clean for w in ["fete", "femei", "locuri f", "locuri_f", "nr f"]) or c_clean == "f":
             col_map["girls"] = col
 
     units = []

@@ -1,13 +1,26 @@
 def normalize_spec(spec: str) -> str:
     if not spec:
         return ""
+    s = spec.strip().lower()
+    s = s.replace("ă", "a").replace("â", "a").replace("î", "i").replace("ș", "s").replace("ş", "s").replace("ț", "t").replace("ţ", "t")
+    s = s.replace(".", " ").replace("-", " ").strip()
+
+    if s in ["ti", "it"] or any(k in s for k in ["teh", "info", "informat"]):
+        return "Tehnologia Informatiei"
+    if s in ["ac"] or any(k in s for k in ["ciber", "aparare"]):
+        return "Aparare Cibernetica"
+    if s in ["sm"] or "securitat" in s:
+        return "Securitate Militara"
+    if s in ["com"] or "comunic" in s:
+        return "Comunicatii"
+
     mapping = {
         "comunicatii": "Comunicatii",
         "aparare cibernetica": "Aparare Cibernetica",
         "securitate militara": "Securitate Militara",
         "tehnologia informatiei": "Tehnologia Informatiei",
     }
-    return mapping.get(spec.strip().lower(), spec.strip())
+    return mapping.get(s, spec.strip())
 
 
 def build_monitor(
