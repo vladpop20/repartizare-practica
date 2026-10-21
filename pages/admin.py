@@ -711,6 +711,8 @@ with tab_config:
                 st.session_state["temp_parsed_students"] = parsed_students
             except Exception as e:
                 st.error(f"Eroare la citirea fișierului: {e}")
+                if "openpyxl" in str(e).lower():
+                    st.info("💡 **Notă:** Pachetul `openpyxl` a fost instalat. Te rugăm să reîmprospătezi pagina (F5) sau să repornești comanda Streamlit în consolă. Poți folosi de asemenea tab-ul **📋 Paste din Excel** de mai sus pentru import instant!")
 
     # Previzualizare elevi analizați
     students_to_preview = st.session_state.get("temp_parsed_students", parsed_students)
@@ -787,6 +789,8 @@ with tab_config:
                 st.session_state["temp_parsed_units"] = parsed_units
             except Exception as e:
                 st.error(f"Eroare la citirea fișierului de unități: {e}")
+                if "openpyxl" in str(e).lower():
+                    st.info("💡 **Notă:** Pachetul `openpyxl` a fost instalat. Te rugăm să reîmprospătezi pagina (F5) sau să repornești comanda Streamlit în consolă. Poți folosi de asemenea tab-ul **📋 Paste din Excel** de mai sus pentru import instant!")
 
     units_to_preview = st.session_state.get("temp_parsed_units", parsed_units)
     if units_to_preview:
