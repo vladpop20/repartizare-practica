@@ -804,11 +804,17 @@ with tab_config:
         df_u_preview.columns = ["Unitate", "Specializare", "Locuri Băieți", "Locuri Fete"]
         st.dataframe(df_u_preview, use_container_width=True)
 
-        if st.button(f"💾 Salvează unitățile în «{target_sess_units['title']}»", type="primary", use_container_width=True):
-            saved_u = sm.save_units_for_session(target_sess_units["id"], units_to_preview)
-            st.session_state["temp_parsed_units"] = None
-            st.success(f"🎉 {saved_u} unități de practică au fost salvate cu succes în sesiunea «{target_sess_units['title']}»!")
-            st.rerun()
+        col_save, col_clear = st.columns([3, 1])
+        with col_save:
+            if st.button(f"💾 Salvează unitățile în «{target_sess_units['title']}»", type="primary", use_container_width=True):
+                saved_u = sm.save_units_for_session(target_sess_units["id"], units_to_preview)
+                st.session_state["temp_parsed_units"] = None
+                st.success(f"🎉 {saved_u} unități de practică au fost salvate cu succes în sesiunea «{target_sess_units['title']}»!")
+                st.rerun()
+        with col_clear:
+            if st.button("🗑️ Anulează previzualizarea", use_container_width=True):
+                st.session_state["temp_parsed_units"] = None
+                st.rerun()
 
     st.write("---")
 

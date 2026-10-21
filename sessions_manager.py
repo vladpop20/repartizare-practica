@@ -497,11 +497,11 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
     if df.empty:
         return []
 
-    # 1. Verificare format tabelar simplu (Coloane: Unitate, Specializare, Băieți, Fete)
+    # 1. Verificare format tabelar simplu (Coloane explicite: Unitate, Specializare, Băieți, Fete)
     col_map = {}
     for col in df.columns:
         c_clean = clean_header_name(str(col))
-        if any(w in c_clean for w in ["unitate", "denumire um", "nume um"]):
+        if any(w in c_clean for w in ["unitatea militara", "denumire um", "nume um", "unitate"]) and "cazare" not in c_clean:
             col_map["unit_name"] = col
         elif any(w in c_clean for w in ["specializ", "spec", "profil", "arma"]):
             col_map["specialization"] = col
@@ -510,14 +510,18 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
         elif any(w in c_clean for w in ["fete", "femei", "locuri f", "locuri_f", "nr f"]) or c_clean == "f":
             col_map["girls"] = col
 
+    # Doar dacă avem coloana de specializare și cel puțin o coloană de locuri în antetul direct
     if "unit_name" in col_map and "specialization" in col_map and ("boys" in col_map or "girls" in col_map):
         units = []
         for _, row in df.iterrows():
             unit_name = str(row.get(col_map.get("unit_name", ""), "")).strip()
-            if not unit_name or unit_name.lower() == "nan":
+            if not unit_name or unit_name.lower() in ["nan", "none"]:
                 continue
 
-            spec = normalize_spec(str(row.get(col_map.get("specialization", ""), "Aparare Cibernetica")))
+            spec = normalize_spec(str(row.get(col_map.get("specialization", ""), "")))
+            if spec not in ["Tehnologia Informatiei", "Aparare Cibernetica", "Securitate Militara", "Comunicatii"]:
+                continue
+
             boys = parse_capacity_int(row.get(col_map.get("boys", 0), 0))
             girls = parse_capacity_int(row.get(col_map.get("girls", 0), 0))
 
@@ -541,7 +545,14 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
     f_col = None
     data_start_row = 0
 
-    # Căutăm antetul în primele 10 rânduri
+    # 2a. Căutăm unit_col în denumirile de coloane existente (ex. df.columns[0] = 'Unitatea militară')
+    for c_idx, col in enumerate(df.columns):
+        c_clean = clean_header_name(str(col))
+        if any(k in c_clean for k in ["unitatea militara", "denumire um", "unitate"]) and "cazare" not in c_clean:
+            unit_col = c_idx
+            break
+
+    # 2b. Căutăm antetul (B, F, Specialitate) în primele 10 rânduri
     for r_idx in range(min(10, len(df))):
         row_vals = [clean_header_name(str(df.iloc[r_idx, c_idx])) for c_idx in range(len(df.columns))]
         for c_idx, val in enumerate(row_vals):
@@ -551,22 +562,23 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
             elif val in ["f", "fete", "femei"]:
                 f_col = c_idx
                 data_start_row = max(data_start_row, r_idx + 1)
-            elif any(k in val for k in ["specialitate", "specializ"]):
+            elif any(k in val for k in ["specialitate", "specializ", "arma"]) and "cazare" not in val:
                 spec_col = c_idx
                 data_start_row = max(data_start_row, r_idx + 1)
-            elif any(k in val for k in ["unitate", "u.m.", "denumire"]):
+            elif unit_col is None and any(k in val for k in ["unitatea militara", "denumire um", "unitate"]) and "cazare" not in val:
                 unit_col = c_idx
 
-    # Dacă unit_col sau spec_col nu au fost găsite în textul antetului, le detectăm din conținut
+    # 2c. Fallback pentru unit_col dacă nu a fost identificat: căutăm coloana cu celule ce încep cu U.M.
     if unit_col is None:
         for c_idx in range(len(df.columns)):
-            col_sample = [str(v) for v in df.iloc[data_start_row:data_start_row+15, c_idx] if pd.notna(v)]
-            if any("u.m" in v.lower() or "um" in v.lower() for v in col_sample):
+            col_sample = [str(v).strip() for v in df.iloc[data_start_row:data_start_row+15, c_idx] if pd.notna(v)]
+            if any(s.upper().startswith("U.M.") or s.upper().startswith("UM ") or s.upper().startswith("UM_") for s in col_sample):
                 unit_col = c_idx
                 break
         if unit_col is None:
             unit_col = 0
 
+    # 2d. Fallback pentru spec_col dacă nu a fost identificat: căutăm coloana cu denumiri de specialități
     if spec_col is None:
         for c_idx in range(len(df.columns)):
             col_sample = [clean_header_name(str(v)) for v in df.iloc[data_start_row:data_start_row+15, c_idx] if pd.notna(v)]
@@ -574,7 +586,7 @@ def process_units_dataframe(df: pd.DataFrame) -> list[dict]:
                 spec_col = c_idx
                 break
 
-    if spec_col is None:
+    if spec_col is None or (b_col is None and f_col is None):
         return []
 
     # Verificăm dacă coloana adiacentă de după unitate (ex: Col B) conține orașul/arma (ex: București SMFT)
