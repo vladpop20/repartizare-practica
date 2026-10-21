@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 
+import importlib
 import sessions_manager as sm
+importlib.reload(sm)
 from monitor_utils import normalize_spec
 from ui_utils import render_html
 
