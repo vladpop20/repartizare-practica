@@ -744,6 +744,27 @@ with tab_edit:
                     else:
                         st.error("A apărut o eroare la salvarea modificărilor în baza de date.")
 
+            # Secțiune de resetare parolă elev
+            st.write("")
+            with st.expander("🔑 Resetare Parolă Cont Elev (la '123456')", expanded=False):
+                st_username = curr_s.get("username") or f"{curr_s.get('last_name', '').lower().strip()}.{curr_s.get('first_name', '').lower().strip()}"
+                st.write(
+                    f"Această opțiune resetează parola contului pentru elevul **{curr_s.get('last_name')} {curr_s.get('first_name')}** "
+                    f"(Username de conectare: ` {st_username} `)."
+                )
+                st.info("💡 Noua parolă a elevului va deveni parola inițială: **`123456`**")
+
+                confirm_pwd = st.checkbox(
+                    f"⚠️ **Confirm că sunt sigur că doresc să resetez parola elevului {curr_s.get('last_name')} {curr_s.get('first_name')} la '123456'.**",
+                    key=f"chk_reset_pwd_{curr_sid}"
+                )
+                if st.button("🔑 Resetează Parola la «123456»", type="secondary", disabled=not confirm_pwd, key=f"btn_reset_pwd_{curr_sid}", use_container_width=True):
+                    if sm.reset_student_password(curr_sid, "123456"):
+                        st.success(f"🎉 Parola pentru elevul {curr_s.get('last_name')} {curr_s.get('first_name')} a fost resetată cu succes la «123456»!")
+                        st.rerun()
+                    else:
+                        st.error("A apărut o eroare la resetarea parolei în baza de date.")
+
     # ------------------------------------------------------------
     # SUBTAB 2: EDITARE UNITĂȚI MILITARE & LOCURI
     # ------------------------------------------------------------

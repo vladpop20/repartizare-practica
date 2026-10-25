@@ -336,6 +336,18 @@ def update_student(session_id: str, student_id: str, updates: dict) -> bool:
         return False
 
 
+def reset_student_password(student_id: str, new_password: str = "123456") -> bool:
+    """Resetează parola unui elev la parola specificată (implicit '123456')."""
+    try:
+        supabase.table("students").update({
+            "password_hash": new_password.strip()
+        }).eq("id", student_id).execute()
+        return True
+    except Exception as e:
+        print(f"Eroare resetare parolă elev {student_id}: {e}")
+        return False
+
+
 def update_unit(session_id: str, unit_id: int, updates: dict) -> bool:
     """Actualizează o unitate militară existentă."""
     try:
