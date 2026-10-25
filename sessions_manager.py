@@ -298,6 +298,95 @@ def get_choices_for_session(session_id: str) -> list[dict]:
 
 
 # ============================================================
+# Modificare directă entități (Elevi, Alegeri, Unități)
+# ============================================================
+def update_student(session_id: str, student_id: str, updates: dict) -> bool:
+    """Actualizează detaliile unui elev și opțiunea aleasă."""
+    try:
+        spec_norm = normalize_spec(updates.get("specialization", ""))
+        spec_val = f"{session_id}__{spec_norm}" if not is_default_session(session_id) else spec_norm
+
+        payload = {
+            "last_name": updates.get("last_name", "").strip(),
+            "first_name": updates.get("first_name", "").strip(),
+            "specialization": spec_val,
+            "average": float(updates.get("average", 0.0)),
+            "gender": (updates.get("gender") or "B").strip().upper()[:1]
+        }
+        supabase.table("students").update(payload).eq("id", student_id).execute()
+
+        # Actualizare alegere unitate
+        if "chosen_unit" in updates:
+            chosen = updates["chosen_unit"]
+            if chosen and chosen.strip() and "(Fără opțiune" not in chosen:
+                canonical_u = clean_unit_name_str(chosen)
+                supabase.table("choices").upsert({
+                    "student_id": student_id,
+                    "option1": canonical_u,
+                    "option2": None,
+                    "option3": None,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }).execute()
+            else:
+                supabase.table("choices").delete().eq("student_id", student_id).execute()
+
+        return True
+    except Exception as e:
+        print(f"Eroare update elev {student_id}: {e}")
+        return False
+
+
+def update_unit(session_id: str, unit_id: int, updates: dict) -> bool:
+    """Actualizează o unitate militară existentă."""
+    try:
+        spec_norm = normalize_spec(updates.get("specialization", ""))
+        spec_val = f"{session_id}__{spec_norm}" if not is_default_session(session_id) else spec_norm
+        clean_name = clean_unit_name_str(updates.get("unit_name", ""))
+
+        payload = {
+            "unit_name": clean_name,
+            "specialization": spec_val,
+            "boys": int(updates.get("boys", 0)),
+            "girls": int(updates.get("girls", 0))
+        }
+        supabase.table("units").update(payload).eq("id", unit_id).execute()
+        return True
+    except Exception as e:
+        print(f"Eroare update unitate {unit_id}: {e}")
+        return False
+
+
+def add_unit_entry(session_id: str, unit_name: str, specialization: str, boys: int, girls: int) -> bool:
+    """Adaugă o nouă intrare de unitate militară pentru o sesiune."""
+    try:
+        spec_norm = normalize_spec(specialization)
+        spec_val = f"{session_id}__{spec_norm}" if not is_default_session(session_id) else spec_norm
+        clean_name = clean_unit_name_str(unit_name)
+
+        payload = {
+            "unit_name": clean_name,
+            "specialization": spec_val,
+            "boys": int(boys),
+            "girls": int(girls)
+        }
+        supabase.table("units").insert(payload).execute()
+        return True
+    except Exception as e:
+        print(f"Eroare adăugare unitate: {e}")
+        return False
+
+
+def delete_unit_entry(session_id: str, unit_id: int) -> bool:
+    """Șterge o intrare de unitate după ID."""
+    try:
+        supabase.table("units").delete().eq("id", unit_id).execute()
+        return True
+    except Exception as e:
+        print(f"Eroare ștergere unitate {unit_id}: {e}")
+        return False
+
+
+# ============================================================
 # Parser inteligent pentru tabele Excel (Paste & File)
 # ============================================================
 def clean_header_name(h: str) -> str:

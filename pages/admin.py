@@ -388,8 +388,9 @@ active_session = sm.get_active_session()
 #
 # TABURI PRINCIPALE ADMIN
 #
-tab_evidence, tab_config = st.tabs([
+tab_evidence, tab_edit, tab_config = st.tabs([
     "📋 Evidență & Alegeri în timp real",
+    "✏️ Editare Date (Elevi & Unități)",
     "⚙️ Configurare Promoții & Sesiuni (Import Excel)"
 ])
 
@@ -588,7 +589,275 @@ with tab_evidence:
 
 
 # ============================================================
-# TAB 2: CONFIGURARE PROMOȚII & SESIUNI (IMPORT EXCEL)
+# TAB 2: EDITARE DATE REALE (ELEVI & UNITĂȚI)
+# ============================================================
+with tab_edit:
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">✏️ Modificare Date Reale (Baza de Date)</div>
+        <div class="guide-box">
+            💡 <b>Panou de editare granulară:</b> Modifică direct în baza de date Supabase datele oricărui <b>elev</b> 
+            (nume, prenume, medie, armă, unitatea militară aleasă) sau ale <b>unităților militare</b> (denumire, locuri alocate pe fiecare armă).<br>
+            Fiecare operațiune de salvare este însoțită de o <b>previzualizare a diferențelor</b> și de un <b>pas de confirmare obligatorie</b> pentru a preveni modificările accidentale.
+        </div>
+    </div>
+    """)
+
+    edit_session_titles = [s["title"] for s in all_sessions]
+    edit_default_idx = 0
+    if active_session:
+        for idx, s in enumerate(all_sessions):
+            if s["id"] == active_session["id"]:
+                edit_default_idx = idx
+                break
+
+    col_es1, col_es2 = st.columns([4, 1.5], vertical_alignment="center")
+    with col_es1:
+        target_edit_title = st.selectbox(
+            "Selectează sesiunea pe care dorești să o editezi:",
+            edit_session_titles,
+            index=edit_default_idx,
+            key="select_session_to_edit"
+        )
+    target_edit_sess = next((s for s in all_sessions if s["title"] == target_edit_title), all_sessions[0])
+    edit_sid = target_edit_sess["id"]
+
+    with col_es2:
+        if target_edit_sess.get("is_active"):
+            render_html('<div style="margin-top: 25px;"><span class="status-active-badge">🟢 Repartizare Activă</span></div>')
+        else:
+            render_html('<div style="margin-top: 25px;"><span class="status-inactive-badge">📁 Sesiune Închisă</span></div>')
+
+    subtab_edit_students, subtab_edit_units = st.tabs([
+        "👨‍🎓 Editare Elevi & Alegeri",
+        "🏢 Editare Unități Militare & Locuri"
+    ])
+
+    # ------------------------------------------------------------
+    # SUBTAB 1: EDITARE ELEVI & ALEGERI
+    # ------------------------------------------------------------
+    with subtab_edit_students:
+        raw_students_list = sm.get_students_for_session(edit_sid)
+        raw_choices_list = sm.get_choices_for_session(edit_sid)
+        st_choices_map = {c["student_id"]: c.get("option1") for c in raw_choices_list}
+
+        if not raw_students_list:
+            st.info(f"ℹ️ Sesiunea «{target_edit_sess['title']}» nu are elevi înregistrați.")
+        else:
+            st_list = sorted(raw_students_list, key=lambda s: (s.get("last_name", "").upper(), s.get("first_name", "").upper()))
+
+            def format_st_picker(idx):
+                s = st_list[idx]
+                c = st_choices_map.get(s["id"])
+                c_txt = f" ➔ 🏢 {c.replace('UM_', 'UM ')}" if c else " (fără alegere)"
+                return f"{s.get('last_name', '')} {s.get('first_name', '')} | {s.get('specialization', '')} | Medie: {float(s.get('average', 0.0)):.2f}{c_txt}"
+
+            selected_st_idx = st.selectbox(
+                "🔍 Caută și alege elevul de modificat:",
+                range(len(st_list)),
+                format_func=format_st_picker,
+                key=f"picker_student_{edit_sid}"
+            )
+            curr_s = st_list[selected_st_idx]
+            curr_sid = curr_s["id"]
+            curr_choice = st_choices_map.get(curr_sid) or ""
+
+            st.write(f"#### 👤 Modificare Date: {curr_s.get('last_name')} {curr_s.get('first_name')} `[{curr_sid}]`")
+
+            col_e1, col_e2, col_e3 = st.columns([1.5, 1.5, 1])
+            with col_e1:
+                new_last_name = st.text_input("Nume de familie", value=curr_s.get("last_name", ""), key=f"e_ln_{curr_sid}")
+            with col_e2:
+                new_first_name = st.text_input("Prenume", value=curr_s.get("first_name", ""), key=f"e_fn_{curr_sid}")
+            with col_e3:
+                new_avg = st.number_input("Medie absolvire", min_value=1.0, max_value=10.0, value=float(curr_s.get("average", 0.0)), step=0.01, format="%.2f", key=f"e_avg_{curr_sid}")
+
+            col_eg, col_esp = st.columns([1, 1.5])
+            with col_eg:
+                curr_g_idx = 0 if curr_s.get("gender") == "B" else 1
+                new_gender = st.selectbox("Gen", ["B", "F"], index=curr_g_idx, format_func=lambda g: "👦 Băiat (B)" if g == "B" else "👧 Fată (F)", key=f"e_gen_{curr_sid}")
+            with col_esp:
+                spec_options = ["Aparare Cibernetica", "Tehnologia Informatiei", "Comunicatii", "Securitate Militara"]
+                norm_curr_spec = normalize_spec(curr_s.get("specialization", ""))
+                curr_spec_idx = spec_options.index(norm_curr_spec) if norm_curr_spec in spec_options else 0
+                new_spec = st.selectbox("Specializare militară", spec_options, index=curr_spec_idx, key=f"e_spec_{curr_sid}")
+
+            # Selector Unitate Aleasă
+            sess_units = sm.get_units_for_session(edit_sid)
+            norm_new_spec = normalize_spec(new_spec)
+            matching_units = sorted(list(set(u["unit_name"] for u in sess_units if normalize_spec(u.get("specialization", "")) == norm_new_spec)))
+
+            choice_dropdown_options = ["(Fără opțiune / Șterge alegerea)"] + matching_units
+            if curr_choice and curr_choice not in choice_dropdown_options:
+                choice_dropdown_options.append(curr_choice)
+
+            curr_choice_index = choice_dropdown_options.index(curr_choice) if curr_choice in choice_dropdown_options else 0
+
+            new_choice_selection = st.selectbox(
+                "🏢 Unitate militară aleasă (Opțiunea 1 a elevului):",
+                choice_dropdown_options,
+                index=curr_choice_index,
+                format_func=lambda x: f"🏢 {x.replace('UM_', 'UM ')}" if not x.startswith("(") else x,
+                key=f"e_choice_{curr_sid}"
+            )
+
+            # Detecție diferențe (Diff)
+            st_changes = []
+            if new_last_name.strip() != curr_s.get("last_name", "").strip():
+                st_changes.append(f"**Nume de familie:** `{curr_s.get('last_name')}` ➔ `{new_last_name.strip()}`")
+            if new_first_name.strip() != curr_s.get("first_name", "").strip():
+                st_changes.append(f"**Prenume:** `{curr_s.get('first_name')}` ➔ `{new_first_name.strip()}`")
+            if abs(new_avg - float(curr_s.get("average", 0.0))) > 0.001:
+                st_changes.append(f"**Medie:** `{float(curr_s.get('average', 0.0)):.2f}` ➔ `{new_avg:.2f}`")
+            if new_gender != curr_s.get("gender"):
+                st_changes.append(f"**Gen:** `{curr_s.get('gender')}` ➔ `{new_gender}`")
+            if normalize_spec(new_spec) != norm_curr_spec:
+                st_changes.append(f"**Specializare:** `{norm_curr_spec}` ➔ `{new_spec}`")
+
+            clean_curr_c = curr_choice.strip() if curr_choice else ""
+            clean_new_c = new_choice_selection.strip() if not new_choice_selection.startswith("(") else ""
+            if clean_new_c != clean_curr_c:
+                old_c_lbl = clean_curr_c.replace("UM_", "UM ") if clean_curr_c else "(Fără opțiune)"
+                new_c_lbl = clean_new_c.replace("UM_", "UM ") if clean_new_c else "(Fără opțiune - ștearsă)"
+                st_changes.append(f"**Unitate aleasă:** `{old_c_lbl}` ➔ `{new_c_lbl}`")
+
+            if not st_changes:
+                st.info("ℹ️ Nu ai modificat niciun câmp pentru acest elev. Datele sunt identice cu cele din baza de date.")
+            else:
+                st.warning("⚠️ **Modificări detectate ce urmează a fi salvate:**\n\n" + "\n\n".join(f"• {c}" for c in st_changes))
+                confirm_save_st = st.checkbox(
+                    f"⚠️ **Ești sigur că vrei să salvezi aceste modificări pentru elevul {curr_s.get('last_name')} {curr_s.get('first_name')}?**",
+                    key=f"chk_confirm_st_save_{curr_sid}"
+                )
+                if st.button("💾 Salvează modificările elevului în baza de date", type="primary", disabled=not confirm_save_st, key=f"btn_save_st_edit_{curr_sid}", use_container_width=True):
+                    updates = {
+                        "last_name": new_last_name,
+                        "first_name": new_first_name,
+                        "average": new_avg,
+                        "gender": new_gender,
+                        "specialization": new_spec,
+                        "chosen_unit": clean_new_c
+                    }
+                    if sm.update_student(edit_sid, curr_sid, updates):
+                        st.success(f"🎉 Datele elevului {new_last_name} {new_first_name} au fost actualizate cu succes!")
+                        st.rerun()
+                    else:
+                        st.error("A apărut o eroare la salvarea modificărilor în baza de date.")
+
+    # ------------------------------------------------------------
+    # SUBTAB 2: EDITARE UNITĂȚI MILITARE & LOCURI
+    # ------------------------------------------------------------
+    with subtab_edit_units:
+        raw_units_list = sm.get_units_for_session(edit_sid)
+
+        if not raw_units_list:
+            st.info(f"ℹ️ Sesiunea «{target_edit_sess['title']}» nu are unități militare înregistrate.")
+        else:
+            sorted_units = sorted(raw_units_list, key=lambda u: (u.get("unit_name", ""), u.get("specialization", "")))
+
+            def format_u_picker(idx):
+                u = sorted_units[idx]
+                disp_u = u.get("unit_name", "").replace("UM_", "UM ")
+                return f"{disp_u} | {u.get('specialization', '')} (Locuri: {u.get('boys', 0)} Băieți, {u.get('girls', 0)} Fete)"
+
+            selected_u_idx = st.selectbox(
+                "🔍 Caută și alege unitatea militară de modificat:",
+                range(len(sorted_units)),
+                format_func=format_u_picker,
+                key=f"picker_unit_{edit_sid}"
+            )
+            curr_u = sorted_units[selected_u_idx]
+            curr_uid = curr_u["id"]
+
+            st.write(f"#### 🏢 Modificare Intrare Unitate: {curr_u.get('unit_name')} — {curr_u.get('specialization')} `[ID: {curr_uid}]`")
+
+            col_un1, col_un2 = st.columns([2, 1.5])
+            with col_un1:
+                new_u_name = st.text_input("Denumire Unitate Militară", value=curr_u.get("unit_name", "").replace("UM_", "UM "), key=f"e_uname_{curr_uid}")
+            with col_un2:
+                u_spec_options = ["Aparare Cibernetica", "Tehnologia Informatiei", "Comunicatii", "Securitate Militara"]
+                norm_curr_u_spec = normalize_spec(curr_u.get("specialization", ""))
+                curr_u_spec_idx = u_spec_options.index(norm_curr_u_spec) if norm_curr_u_spec in u_spec_options else 0
+                new_u_spec = st.selectbox("Specializare militară", u_spec_options, index=curr_u_spec_idx, key=f"e_uspec_{curr_uid}")
+
+            col_ub, col_ug = st.columns([1, 1])
+            with col_ub:
+                new_u_boys = st.number_input("Locuri alocate Băieți", min_value=0, max_value=100, value=int(curr_u.get("boys", 0)), step=1, key=f"e_uboys_{curr_uid}")
+            with col_ug:
+                new_u_girls = st.number_input("Locuri alocate Fete", min_value=0, max_value=100, value=int(curr_u.get("girls", 0)), step=1, key=f"e_ugirls_{curr_uid}")
+
+            # Detecție diferențe
+            u_changes = []
+            clean_new_u = sm.clean_unit_name_str(new_u_name)
+            if clean_new_u != curr_u.get("unit_name"):
+                u_changes.append(f"**Denumire:** `{curr_u.get('unit_name')}` ➔ `{clean_new_u}`")
+            if normalize_spec(new_u_spec) != norm_curr_u_spec:
+                u_changes.append(f"**Specializare:** `{norm_curr_u_spec}` ➔ `{new_u_spec}`")
+            if new_u_boys != int(curr_u.get("boys", 0)):
+                u_changes.append(f"**Locuri Băieți:** `{curr_u.get('boys', 0)}` ➔ `{new_u_boys}`")
+            if new_u_girls != int(curr_u.get("girls", 0)):
+                u_changes.append(f"**Locuri Fete:** `{curr_u.get('girls', 0)}` ➔ `{new_u_girls}`")
+
+            if not u_changes:
+                st.info("ℹ️ Nu ai modificat niciun câmp pentru această unitate militară.")
+            else:
+                st.warning("⚠️ **Modificări detectate ce urmează a fi salvate:**\n\n" + "\n\n".join(f"• {c}" for c in u_changes))
+                confirm_save_u = st.checkbox(
+                    f"⚠️ **Ești sigur că vrei să salvezi modificările pentru unitatea {curr_u.get('unit_name')}?**",
+                    key=f"chk_confirm_u_save_{curr_uid}"
+                )
+                if st.button("💾 Salvează modificările unității în baza de date", type="primary", disabled=not confirm_save_u, key=f"btn_save_u_edit_{curr_uid}", use_container_width=True):
+                    updates = {
+                        "unit_name": clean_new_u,
+                        "specialization": new_u_spec,
+                        "boys": new_u_boys,
+                        "girls": new_u_girls
+                    }
+                    if sm.update_unit(edit_sid, curr_uid, updates):
+                        st.success(f"🎉 Unitatea {clean_new_u} a fost actualizată cu succes!")
+                        st.rerun()
+                    else:
+                        st.error("A apărut o eroare la salvarea unității în baza de date.")
+
+            # Secțiune de ștergere unitate
+            st.write("")
+            with st.expander("🗑️ Ștergere intrare unitate militară"):
+                st.warning(f"Atenție: Această acțiune va șterge definitiv din sesiune intrarea: **{curr_u.get('unit_name')} ({curr_u.get('specialization')})**.")
+                confirm_del_u = st.checkbox(f"⚠️ Confirm ștergerea definitivă a intrării [ID: {curr_uid}]", key=f"chk_del_u_{curr_uid}")
+                if st.button("🗑️ Șterge definitiv această unitate", type="secondary", disabled=not confirm_del_u, key=f"btn_del_u_{curr_uid}"):
+                    if sm.delete_unit_entry(edit_sid, curr_uid):
+                        st.success("Unitatea a fost ștearsă cu succes!")
+                        st.rerun()
+                    else:
+                        st.error("Eroare la ștergerea unității.")
+
+        # Secțiune de adăugare unitate nouă
+        st.write("---")
+        with st.expander("➕ Adaugă o unitate militară nouă în această sesiune"):
+            st.write("Completează datele pentru noua unitate militară:")
+            col_add1, col_add2 = st.columns([2, 1.5])
+            with col_add1:
+                add_u_name = st.text_input("Denumire Unitate (ex: UM 01234 Bucuresti)", key=f"add_uname_{edit_sid}")
+            with col_add2:
+                add_u_spec = st.selectbox("Specializare militară", ["Aparare Cibernetica", "Tehnologia Informatiei", "Comunicatii", "Securitate Militara"], key=f"add_uspec_{edit_sid}")
+
+            col_addb, col_addg = st.columns([1, 1])
+            with col_addb:
+                add_u_boys = st.number_input("Locuri alocate Băieți", min_value=0, max_value=100, value=1, step=1, key=f"add_uboys_{edit_sid}")
+            with col_addg:
+                add_u_girls = st.number_input("Locuri alocate Fete", min_value=0, max_value=100, value=0, step=1, key=f"add_ugirls_{edit_sid}")
+
+            confirm_add_u = st.checkbox("⚠️ **Confirm că sunt sigur că doresc să introduc această unitate nouă în baza de date.**", key=f"chk_confirm_add_{edit_sid}")
+            if st.button("➕ Adaugă unitatea în sesiune", type="primary", disabled=not confirm_add_u or not add_u_name.strip(), key=f"btn_add_unit_{edit_sid}", use_container_width=True):
+                if sm.add_unit_entry(edit_sid, add_u_name, add_u_spec, add_u_boys, add_u_girls):
+                    st.success(f"🎉 Unitatea {add_u_name} a fost adăugată cu succes!")
+                    st.rerun()
+                else:
+                    st.error("A apărut o eroare la adăugarea unității.")
+
+
+# ============================================================
+# TAB 3: CONFIGURARE PROMOȚII & SESIUNI (IMPORT EXCEL)
 # ============================================================
 with tab_config:
     # ------------------------------------------------------------
