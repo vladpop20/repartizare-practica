@@ -891,20 +891,22 @@ with tab_config:
     """)
 
     if active_session:
-        st.success(f"🟢 În prezent, repartizarea în pagina principală **App** este **DESCHISĂ** pentru sesiunea:\n\n**{active_session['title']}**")
+        active_mode = sm.get_session_mode(active_session["id"])
+        mode_badge = "⚖️ REAL (În ordinea mediilor)" if active_mode == "real" else "🎮 SIMULARE (Liber)"
+        st.success(f"🟢 În prezent, repartizarea în pagina principală **App** este **DESCHISĂ** pentru sesiunea:\n\n**{active_session['title']}**\n\n📌 **Mod repartiție curent:** `{mode_badge}`")
     else:
         st.warning("🔒 În prezent, repartizarea în pagina principală **App** este **OPRITĂ**. Elevii nu pot alege opțiuni (pagina este blocată).")
 
     col_act1, col_act2 = st.columns([3, 2], vertical_alignment="center")
     with col_act1:
         sess_to_activate = st.selectbox(
-            "Alege sesiunea pe care dorești să o activezi:",
+            "Alege sesiunea pe care dorești să o configurezi / activezi:",
             [s["title"] for s in all_sessions],
             index=default_idx,
             key="select_session_to_activate"
         )
+    target_s = next(s for s in all_sessions if s["title"] == sess_to_activate)
     with col_act2:
-        target_s = next(s for s in all_sessions if s["title"] == sess_to_activate)
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             if st.button("🟢 Deschide în App", use_container_width=True, key="btn_activate_session"):
@@ -916,6 +918,37 @@ with tab_config:
                 sm.set_active_session(None)
                 st.toast("Repartizarea a fost oprită! Pagina App este acum blocată.")
                 st.rerun()
+
+    # Comutator Mod de funcționare (Simulare vs Real)
+    current_sess_mode = sm.get_session_mode(target_s["id"])
+    mode_idx = 0 if current_sess_mode == "simulare" else 1
+
+    st.write("")
+    st.write(f"⚙️ **Modul de funcționare al repartiției pentru «{target_s['title']}»:**")
+
+    mode_options = [
+        "🎮 Mod Simulare (Liber — Primul venit, primul servit)",
+        "⚖️ Mod Real (Strict în ordinea mediilor descrescătoare pe specializare)"
+    ]
+
+    selected_mode_radio = st.radio(
+        "Alege modul de funcționare:",
+        mode_options,
+        index=mode_idx,
+        help="În Modul Simulare, orice elev se poate autentifica și poate alege liber un loc rămas disponibil. În Modul Real, elevii pot alege STRICT în ordinea descrescătoare a mediilor de la aceeași armă (elevul cu media mai mică trebuie să aștepte până alege cel cu media imediat superioară).",
+        key=f"radio_mode_{target_s['id']}"
+    )
+
+    new_mode_val = "simulare" if "Simulare" in selected_mode_radio else "real"
+    if new_mode_val != current_sess_mode:
+        sm.set_session_mode(target_s["id"], new_mode_val)
+        st.toast(f"Modul de repartiție a fost setat la: {new_mode_val.upper()}!")
+        st.rerun()
+
+    if new_mode_val == "real":
+        st.info("⚖️ **Modul REAL este activat:** În pagina principală **App**, elevii vor putea alege strict în ordinea mediilor. Elevul care nu este la rând va vedea un banner cu numele și media colegului care alege în acel moment.")
+    else:
+        st.caption("🎮 *Modul SIMULARE este activat: Selecție liberă fără prioritizare pe bază de rând.*")
 
     st.write("---")
 
@@ -1181,6 +1214,7 @@ with tab_config:
         s_elevi = len(sm.get_students_for_session(s_id))
         s_unitati = len(sm.get_units_for_session(s_id))
         s_status = "🟢 ACTIVĂ" if s.get("is_active") else "📁 Inactivă"
+        s_mode = "⚖️ REAL" if s.get("allocation_mode") == "real" else "🎮 Simulare"
 
         sess_summary_rows.append({
             "ID": s_id,
@@ -1189,6 +1223,7 @@ with tab_config:
             "Promoție": s["promotion"],
             "Tip Practică": s["practice_type"],
             "An": s["year"],
+            "Mod": s_mode,
             "Elevi": s_elevi,
             "Unități": s_unitati,
             "Stare": s_status

@@ -16,6 +16,7 @@ DEFAULT_SESSION = {
     "year": 2026,
     "title": "Maiștri Militari - Promoția 2025-2027 - Practica 1 (2026)",
     "is_active": True,
+    "allocation_mode": "simulare",
     "created_at": "2026-06-24T12:00:00Z"
 }
 
@@ -102,6 +103,127 @@ def set_active_session(session_id: str | None) -> bool:
     return _write_config("__APP_CONFIG_SESSIONS__", sessions)
 
 
+def get_session_mode(session_id: str | None) -> str:
+    """Returnează modul de alocare al sesiunii: 'simulare' sau 'real' (implicit 'simulare')."""
+    if not session_id:
+        return "simulare"
+    s = get_session_by_id(session_id)
+    if s:
+        return s.get("allocation_mode", "simulare")
+    return "simulare"
+
+
+def set_session_mode(session_id: str, mode: str) -> bool:
+    """Setează modul de alocare: 'simulare' sau 'real'."""
+    sessions = get_all_sessions()
+    for s in sessions:
+        if s["id"] == session_id:
+            s["allocation_mode"] = mode
+    return _write_config("__APP_CONFIG_SESSIONS__", sessions)
+
+
+def get_turn_student_for_spec(session_id: str, specialization: str) -> dict | None:
+    """Returnează elevul care este la rând pentru o specializare în modul Real."""
+    spec_norm = normalize_spec(specialization)
+    students = get_students_for_session(session_id)
+    spec_students = [s for s in students if normalize_spec(s.get("specialization", "")) == spec_norm]
+    if not spec_students:
+        return None
+
+    spec_students.sort(
+        key=lambda s: (
+            -float(s.get("average", 0.0)),
+            s.get("last_name", "").upper(),
+            s.get("first_name", "").upper()
+        )
+    )
+
+    choices = get_choices_for_session(session_id)
+    chosen_ids = set(c["student_id"] for c in choices if c.get("option1") and str(c.get("option1")).strip())
+
+    for s in spec_students:
+        if s["id"] not in chosen_ids:
+            return s
+    return None
+
+
+def get_turn_status_for_student(session_id: str, student_id: str) -> dict:
+    """Calculează starea rândului la repartiție pentru un elev într-o sesiune."""
+    mode = get_session_mode(session_id)
+    if mode != "real":
+        return {
+            "mode": "simulare",
+            "is_my_turn": True,
+            "already_chosen": False,
+            "turn_student": None,
+            "rank": 1,
+            "total_in_spec": 1,
+            "ahead_count": 0,
+            "student_spec": ""
+        }
+
+    students = get_students_for_session(session_id)
+    student = next((s for s in students if s["id"] == student_id), None)
+    if not student:
+        return {
+            "mode": "real",
+            "is_my_turn": False,
+            "already_chosen": False,
+            "turn_student": None,
+            "rank": 0,
+            "total_in_spec": 0,
+            "ahead_count": 0,
+            "student_spec": ""
+        }
+
+    spec_norm = normalize_spec(student.get("specialization", ""))
+    spec_students = [s for s in students if normalize_spec(s.get("specialization", "")) == spec_norm]
+
+    # Sortăm descrescător după medie, apoi alfabetic
+    spec_students.sort(
+        key=lambda s: (
+            -float(s.get("average", 0.0)),
+            s.get("last_name", "").upper(),
+            s.get("first_name", "").upper()
+        )
+    )
+
+    choices = get_choices_for_session(session_id)
+    chosen_ids = set(c["student_id"] for c in choices if c.get("option1") and str(c.get("option1")).strip())
+
+    already_chosen = student_id in chosen_ids
+
+    # Găsim primul elev din listă care NU a ales încă
+    turn_student = None
+    for s in spec_students:
+        if s["id"] not in chosen_ids:
+            turn_student = s
+            break
+
+    # Calculăm rank-ul elevului curent și câți sunt înaintea lui nealeși
+    my_rank = 1
+    ahead_count = 0
+    for idx, s in enumerate(spec_students, 1):
+        if s["id"] == student_id:
+            my_rank = idx
+            break
+        if s["id"] not in chosen_ids:
+            ahead_count += 1
+
+    is_my_turn = (turn_student is not None and turn_student["id"] == student_id)
+
+    return {
+        "mode": "real",
+        "is_my_turn": is_my_turn,
+        "already_chosen": already_chosen,
+        "turn_student": turn_student,
+        "rank": my_rank,
+        "total_in_spec": len(spec_students),
+        "ahead_count": ahead_count,
+        "student_spec": spec_norm
+    }
+
+
 def create_session(category: str, promotion: str, practice_type: str, year: int) -> dict:
     """Creează o nouă sesiune de practică."""
     sessions = get_all_sessions()
@@ -131,6 +253,7 @@ def create_session(category: str, promotion: str, practice_type: str, year: int)
         "year": int(year),
         "title": title,
         "is_active": False,
+        "allocation_mode": "simulare",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 

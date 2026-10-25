@@ -102,6 +102,127 @@ div[data-testid="stForm"] {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
 }
 
+/* Carduri rând repartiție modul Real */
+.turn-active-card {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(5, 150, 105, 0.1) 100%);
+    border: 1.5px solid rgba(16, 185, 129, 0.55);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+}
+
+.turn-badge-active {
+    display: inline-block;
+    background: #10b981;
+    color: #ffffff;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+}
+
+.turn-waiting-card {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, rgba(180, 83, 9, 0.08) 100%);
+    border: 1.5px solid rgba(245, 158, 11, 0.45);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.1);
+}
+
+.turn-badge-waiting {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.25);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+}
+
+.turn-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+.turn-desc {
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    line-height: 1.5;
+}
+
+.turn-status-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    color: #e2e8f0;
+}
+
+.turn-current-person {
+    color: #fbbf24;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.turn-my-position {
+    color: #94a3b8;
+    font-size: 0.88rem;
+}
+
+.turn-completed-card {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+.turn-badge-completed {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.25);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+}
+
+.mode-simulare-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-top: 6px;
+    margin-bottom: 14px;
+}
+
 /* Responsivitate pentru telefoane (>= 6.5 inchi) */
 @media (max-width: 640px) {
     .block-container {
@@ -172,12 +293,86 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
 
     st.subheader("Selectare unitate de practică")
 
+    # Verificare Mod de repartiție și starea rândului
+    turn_status = sm.get_turn_status_for_student(active_session_id, student_id)
+    is_real_mode = (turn_status.get("mode") == "real")
+    is_my_turn = turn_status.get("is_my_turn", True)
+    turn_student = turn_status.get("turn_student")
+
     # Calculăm în timp real locurile ocupate de ALȚI elevi din sesiunea curentă
     all_choices = sm.get_choices_for_session(active_session_id)
     all_students = sm.get_students_for_session(active_session_id)
     students_map = {s["id"]: s for s in all_students}
 
     norm_spec = normalize_spec(specializare)
+
+    # Afișare bannere de stare rând / mod
+    if is_real_mode:
+        if saved_canonical:
+            disp_saved = saved_canonical.replace("UM_", "UM ")
+            next_turn_text = ""
+            if turn_student:
+                next_turn_text = f"<br>În acest moment, la specializarea ta este la rând: <b>{turn_student.get('last_name')} {turn_student.get('first_name')}</b> (Medie: <b>{float(turn_student.get('average', 0.0)):.2f}</b>)."
+            else:
+                next_turn_text = "<br>🎉 <i>Toți elevii de la specializarea ta și-au ales locurile de practică!</i>"
+            render_html(f"""
+            <div class="turn-completed-card">
+                <div class="turn-badge-completed">✅ OPȚIUNE SALVATĂ & CONFIRMATĂ</div>
+                <div class="turn-title">Unitate aleasă: <b>{disp_saved}</b></div>
+                <div class="turn-desc">
+                    Locul tău de practică este înregistrat în cadrul repartiției oficiale.{next_turn_text}
+                </div>
+            </div>
+            """)
+        elif is_my_turn:
+            render_html(f"""
+            <div class="turn-active-card">
+                <div class="turn-badge-active">🟢 ESTE RÂNDUL TĂU SĂ ALEGI!</div>
+                <div class="turn-title">Ai prioritate la alegerea locului de practică</div>
+                <div class="turn-desc">
+                    Ești pe poziția <b>#{turn_status.get('rank', 1)}</b> conform mediei tale (<b>{float(student_record.get('average', 0.0)):.2f}</b>) dintre elevii care nu au ales încă de la profilul <b>{norm_spec}</b>.<br>
+                    Selectează unitatea dorită din opțiunile disponibile mai jos și confirmă alegerea:
+                </div>
+            </div>
+            """)
+        else:
+            ts_name = f"{turn_student.get('last_name')} {turn_student.get('first_name')}" if turn_student else "Necunoscut"
+            ts_avg = f"{float(turn_student.get('average', 0.0)):.2f}" if turn_student else "-"
+            render_html(f"""
+            <div class="turn-waiting-card">
+                <div class="turn-badge-waiting">⏳ ÎNCĂ NU ȚI-A VENIT RÂNDUL</div>
+                <div class="turn-title">Repartiție în mod REAL (Strict în ordinea mediilor)</div>
+                <div class="turn-status-box">
+                    <div class="turn-current-person">📍 În acest moment alege: <b>{ts_name}</b> (Medie: <b>{ts_avg}</b>)</div>
+                    <div class="turn-my-position">
+                        📊 Ești pe locul <b>#{turn_status.get('rank', 0)}</b> din {turn_status.get('total_in_spec', 0)} elevi la profilul <b>{norm_spec}</b>.<br>
+                        Mai sunt <b>{turn_status.get('ahead_count', 0)} elevi</b> înaintea ta care trebuie să își aleagă locul.
+                    </div>
+                </div>
+                <div class="turn-desc">
+                    💡 <i>Poți consulta mai jos locurile rămase în prezent. Butonul de salvare se va activa automat când colegii din fața ta finalizează selecția.</i>
+                </div>
+            </div>
+            """)
+            if st.button("🔄 Verifică dacă ți-a venit rândul", key=f"{student_id}_refresh_turn", use_container_width=True):
+                st.rerun()
+    else:
+        # Mod Simulare
+        render_html("""
+        <div class="mode-simulare-pill">
+            🎮 <span><b>Mod Simulare Activ:</b> Poți alege sau schimba liber orice loc disponibil (primul venit, primul servit).</span>
+        </div>
+        """)
+        if saved_canonical:
+            disp_saved = saved_canonical.replace("UM_", "UM ")
+            render_html(
+                f"""
+<div class="saved-choice-banner">
+    <div class="saved-choice-label">Opțiunea ta salvată în prezent</div>
+    <div class="saved-choice-val">✅ {disp_saved}</div>
+</div>
+"""
+            )
 
     occupied_spots = {}
     for c in all_choices:
@@ -232,17 +427,6 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
                 available_units.append(unit)
                 remaining_spots[canonical_unit_name] = rem
 
-    if saved_canonical:
-        disp_saved = saved_canonical.replace("UM_", "UM ")
-        render_html(
-            f"""
-<div class="saved-choice-banner">
-    <div class="saved-choice-label">Opțiunea ta salvată în prezent</div>
-    <div class="saved-choice-val">✅ {disp_saved}</div>
-</div>
-"""
-        )
-
     if not available_units:
         st.warning("Nu mai există locuri disponibile pentru profilul tău.")
         return
@@ -264,15 +448,28 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
         else:
             return f"{disp} ({rem} locuri disponibile)"
 
+    # Control acces pe baza modului Real vs Simulare
+    disable_controls = False
+    btn_label = "Salvează opțiunea"
+
+    if is_real_mode:
+        if saved_canonical:
+            disable_controls = True
+            btn_label = "✅ Opțiune confirmată & înregistrată"
+        elif not is_my_turn:
+            disable_controls = True
+            btn_label = "🔒 Salvare blocată (Așteaptă să-ți vină rândul)"
+
     selected_canonical = st.selectbox(
         "Alege unitatea dorită",
         unit_canonical_keys,
         index=default_index,
         format_func=format_unit_label,
         key=f"{student_id}_selected_unit",
+        disabled=disable_controls,
     )
 
-    if st.button("Salvează opțiunea", key=f"{student_id}_save_choice", use_container_width=True):
+    if st.button(btn_label, key=f"{student_id}_save_choice", use_container_width=True, disabled=disable_controls):
         save_choice(
             student_id,
             selected_canonical,
@@ -308,6 +505,8 @@ if not active_session:
     st.stop()
 
 # Banner sesiune activă
+active_mode = sm.get_session_mode(active_session["id"])
+mode_badge = "⚖️ Mod Real" if active_mode == "real" else "🎮 Mod Simulare"
 render_html(f"""
 <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
     <div>
@@ -315,7 +514,7 @@ render_html(f"""
         <div style="color: #ffffff; font-weight: 700; font-size: 1.05rem; margin-top: 2px;">{active_session.get('title', active_session.get('name', 'Sesiune activă'))}</div>
     </div>
     <span style="background: rgba(16, 185, 129, 0.2); color: #a7f3d0; font-size: 0.8rem; padding: 4px 10px; border-radius: 16px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
-        {active_session.get('category', 'MM')} • {active_session.get('practice_type', '')} ({active_session.get('year', '')})
+        {active_session.get('category', 'MM')} • {active_session.get('practice_type', '')} ({active_session.get('year', '')}) • {mode_badge}
     </span>
 </div>
 """)

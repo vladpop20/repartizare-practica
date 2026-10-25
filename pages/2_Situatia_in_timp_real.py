@@ -106,6 +106,15 @@ with col_f2:
         placeholder="Nume sau prenume..."
     ).strip().lower()
 
+# Indicator Mod Real și elev aflat la rând
+if sm.get_session_mode(selected_session["id"]) == "real":
+    turn_st_mon = sm.get_turn_student_for_spec(selected_session["id"], specializare)
+    if turn_st_mon:
+        st.info(f"⚖️ **Mod REAL activ (strict pe bază de medii):** În acest moment este la rând elevul **{turn_st_mon['last_name']} {turn_st_mon['first_name']}** (Medie: **{float(turn_st_mon.get('average', 0.0)):.2f}**)")
+    else:
+        st.success(f"🎉 **Mod REAL:** Toți elevii de la specializarea **{specializare}** și-au exprimat opțiunea!")
+
+
 #
 # Layout principal cu 2 coloane: Stânga (Unități de practică) | Dreapta (Statistici generale)
 #
