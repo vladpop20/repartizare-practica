@@ -732,11 +732,42 @@ with tab_config:
         df_preview_st.columns = ["Nume", "Prenume", "Specializare", "Medie", "Gen", "Username Generat", "Parolă Inițială"]
         st.dataframe(df_preview_st, use_container_width=True)
 
-        if st.button(f"💾 Salvează cei {len(students_to_preview)} elevi în «{target_sess_students['title']}»", type="primary", use_container_width=True):
-            saved_cnt = sm.save_students_for_session(target_sess_students["id"], students_to_preview)
-            st.session_state["temp_parsed_students"] = None
-            st.success(f"🎉 {saved_cnt} elevi au fost salvați și înregistrați cu succes în sesiunea «{target_sess_students['title']}»!")
-            st.rerun()
+        # Verificare date existente pentru prevenirea suprascrierii accidentale
+        existing_st = sm.get_students_for_session(target_sess_students["id"])
+        existing_ch = sm.get_choices_for_session(target_sess_students["id"])
+
+        can_save_st = True
+        if existing_st:
+            st.error(
+                f"⚠️ **ATENȚIE: Sesiunea «{target_sess_students['title']}» conține deja {len(existing_st)} elevi înregistrați!**\n\n"
+                f"Salvarea va **suprascrie / înlocui** elevii existenți din această sesiune."
+                + (f"\n\n🚨 **PERICOL MARE:** Există deja **{len(existing_ch)} opțiuni salvate de către elevi** în această sesiune! Suprascrierea elevilor va afecta alegerile făcute." if existing_ch else "")
+            )
+            confirm_st = st.checkbox(
+                f"⚠️ **Confirm că sunt sigur că vreau să SUPRASCRIU cei {len(existing_st)} elevi existenți** din «{target_sess_students['title']}» cu această listă nouă de {len(students_to_preview)} elevi.",
+                key=f"confirm_overwrite_st_{target_sess_students['id']}"
+            )
+            can_save_st = confirm_st
+
+        col_save_st, col_clear_st = st.columns([3, 1])
+        with col_save_st:
+            if st.button(
+                f"💾 Salvează cei {len(students_to_preview)} elevi în «{target_sess_students['title']}»",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_save_st,
+                key="btn_save_students"
+            ):
+                saved_cnt = sm.save_students_for_session(target_sess_students["id"], students_to_preview)
+                st.session_state["temp_parsed_students"] = None
+                st.success(f"🎉 {saved_cnt} elevi au fost salvați și înregistrați cu succes în sesiunea «{target_sess_students['title']}»!")
+                st.rerun()
+            if not can_save_st:
+                st.caption("🔒 *Butonul de salvare este blocat până când bifezi confirmarea de mai sus.*")
+        with col_clear_st:
+            if st.button("🗑️ Anulează previzualizarea", key="clear_preview_st", use_container_width=True):
+                st.session_state["temp_parsed_students"] = None
+                st.rerun()
 
     st.write("---")
 
@@ -806,15 +837,40 @@ with tab_config:
         df_u_preview.columns = ["Unitate", "Specializare", "Locuri Băieți", "Locuri Fete"]
         st.dataframe(df_u_preview, use_container_width=True)
 
+        # Verificare date existente pentru prevenirea suprascrierii accidentale
+        existing_u = sm.get_units_for_session(target_sess_units["id"])
+        can_save_u = True
+        if existing_u:
+            tot_ex_b = sum(u.get("boys", 0) for u in existing_u)
+            tot_ex_f = sum(u.get("girls", 0) for u in existing_u)
+            st.error(
+                f"⚠️ **ATENȚIE: Sesiunea «{target_sess_units['title']}» conține deja {len(existing_u)} unități militare înregistrate** "
+                f"(totalizând {tot_ex_b + tot_ex_f} locuri: {tot_ex_b} Băieți, {tot_ex_f} Fete)!\n\n"
+                f"Salvarea noilor date va **suprascrie / înlocui** unitățile existente din această sesiune."
+            )
+            confirm_u = st.checkbox(
+                f"⚠️ **Confirm că sunt sigur că vreau să SUPRASCRIU cele {len(existing_u)} unități existente** din «{target_sess_units['title']}» cu această listă nouă de {len(units_to_preview)} unități ({tot_b + tot_f} locuri).",
+                key=f"confirm_overwrite_u_{target_sess_units['id']}"
+            )
+            can_save_u = confirm_u
+
         col_save, col_clear = st.columns([3, 1])
         with col_save:
-            if st.button(f"💾 Salvează unitățile în «{target_sess_units['title']}»", type="primary", use_container_width=True):
+            if st.button(
+                f"💾 Salvează unitățile în «{target_sess_units['title']}»",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_save_u,
+                key="btn_save_units"
+            ):
                 saved_u = sm.save_units_for_session(target_sess_units["id"], units_to_preview)
                 st.session_state["temp_parsed_units"] = None
                 st.success(f"🎉 {saved_u} unități de practică au fost salvate cu succes în sesiunea «{target_sess_units['title']}»!")
                 st.rerun()
+            if not can_save_u:
+                st.caption("🔒 *Butonul de salvare este blocat până când bifezi confirmarea de mai sus.*")
         with col_clear:
-            if st.button("🗑️ Anulează previzualizarea", use_container_width=True):
+            if st.button("🗑️ Anulează previzualizarea", key="clear_preview_u", use_container_width=True):
                 st.session_state["temp_parsed_units"] = None
                 st.rerun()
 
