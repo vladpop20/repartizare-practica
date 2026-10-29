@@ -285,3 +285,4 @@ def generate_repartition_excel(session_title: str, records: list[dict], units_di
     wb.save(output)
     output.seek(0)
     return output.getvalue()
+

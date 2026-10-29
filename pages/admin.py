@@ -349,7 +349,9 @@ def load_admin_css() -> None:
 }
 </style>
 """)
-    render_html(get_theme_css())
+    theme_css = get_theme_css()
+    if theme_css:
+        render_html(theme_css)
 
 
 def get_spec_badge_html(spec: str) -> str:

@@ -5,8 +5,13 @@ def render_html(html_str: str) -> None:
     """
     Randează HTML fără a permite parser-ului Markdown să interpreteze
     liniile indentate (4+ spații) drept blocuri de cod <pre><code>.
+    Ignoră în siguranță conținutul gol pentru a preveni excepția st.html body cannot be empty.
     """
+    if not html_str or not html_str.strip():
+        return
     clean = "\n".join(line.strip() for line in html_str.splitlines() if line.strip())
+    if not clean:
+        return
     if hasattr(st, "html"):
         st.html(clean)
     else:
@@ -842,7 +847,9 @@ def load_css():
 }
 </style>
 """)
-    render_html(get_theme_css())
+    theme_css = get_theme_css()
+    if theme_css:
+        render_html(theme_css)
 
 
 def render_unit_card(unit_name: str, unit: dict, cautare: str = "") -> None:

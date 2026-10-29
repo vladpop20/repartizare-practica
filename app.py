@@ -312,7 +312,9 @@ div[data-testid="stForm"] {
 }
 </style>
 """)
-    render_html(get_theme_css())
+    theme_css = get_theme_css()
+    if theme_css:
+        render_html(theme_css)
 
 
 def init_session_state() -> None:
