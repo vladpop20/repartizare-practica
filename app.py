@@ -24,11 +24,66 @@ def load_app_css() -> None:
 /* Centrare și limitare lățime container pe laptop/desktop, adaptiv pe mobil */
 .block-container {
     max-width: 680px !important;
-    padding-top: 2rem !important;
+    padding-top: 4.25rem !important;
     padding-bottom: 3.5rem !important;
     padding-left: 1.25rem !important;
     padding-right: 1.25rem !important;
     margin: 0 auto !important;
+}
+
+/* Titlu pagină principală adaptiv */
+h1 {
+    font-size: 2.1rem !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0.25rem !important;
+    padding-top: 0 !important;
+    color: #ffffff !important;
+}
+
+div[data-testid="stCaptionContainer"] {
+    margin-bottom: 1.2rem !important;
+}
+
+/* Card sesiune activă */
+.session-active-card {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.session-status-tag {
+    color: #6ee7b7;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+
+.session-title-text {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.35;
+}
+
+.session-badge-pill {
+    background: rgba(16, 185, 129, 0.2);
+    color: #a7f3d0;
+    font-size: 0.8rem;
+    padding: 5px 12px;
+    border-radius: 16px;
+    font-weight: 600;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    white-space: nowrap;
 }
 
 /* Card profil elev conectat */
@@ -223,21 +278,36 @@ div[data-testid="stForm"] {
     margin-bottom: 14px;
 }
 
-/* Responsivitate pentru telefoane (>= 6.5 inchi) */
-@media (max-width: 640px) {
+/* Responsivitate pentru telefoane (inclusiv Samsung Galaxy S23 Ultra, S24, iPhone etc.) */
+@media (max-width: 768px) {
     .block-container {
-        padding-top: 1.25rem !important;
+        padding-top: 4.75rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+        padding-bottom: 3rem !important;
     }
     h1 {
-        font-size: 1.7rem !important;
+        font-size: 1.65rem !important;
+        line-height: 1.3 !important;
+        margin-top: 0 !important;
+        padding-top: 0.25rem !important;
+        word-break: break-word;
     }
     .profile-greeting {
         font-size: 1.05rem;
     }
     div[data-testid="stForm"] {
         padding: 16px !important;
+    }
+    .session-active-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 14px 16px;
+    }
+    .session-badge-pill {
+        white-space: normal;
+        width: auto;
     }
 }
 </style>
@@ -508,12 +578,12 @@ if not active_session:
 active_mode = sm.get_session_mode(active_session["id"])
 mode_badge = "⚖️ Mod Real" if active_mode == "real" else "🎮 Mod Simulare"
 render_html(f"""
-<div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 12px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+<div class="session-active-card">
     <div>
-        <span style="color: #6ee7b7; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">🟢 Sesiune Deschisă</span>
-        <div style="color: #ffffff; font-weight: 700; font-size: 1.05rem; margin-top: 2px;">{active_session.get('title', active_session.get('name', 'Sesiune activă'))}</div>
+        <div class="session-status-tag">🟢 Sesiune Deschisă</div>
+        <div class="session-title-text">{active_session.get('title', active_session.get('name', 'Sesiune activă'))}</div>
     </div>
-    <span style="background: rgba(16, 185, 129, 0.2); color: #a7f3d0; font-size: 0.8rem; padding: 4px 10px; border-radius: 16px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);">
+    <span class="session-badge-pill">
         {active_session.get('category', 'MM')} • {active_session.get('practice_type', '')} ({active_session.get('year', '')}) • {mode_badge}
     </span>
 </div>

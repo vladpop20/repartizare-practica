@@ -16,11 +16,19 @@ def render_html(html_str: str) -> None:
 def load_css():
     render_html("""
 <style>
-/* Stil container principal */
+/* Stil container principal - spațiu generos pentru a preveni suprapunerea cu bara superioară Streamlit */
 .block-container {
-    padding-top: 1.5rem !important;
+    padding-top: 4.25rem !important;
     padding-bottom: 2.5rem !important;
     max-width: 1400px !important;
+}
+
+@media (max-width: 768px) {
+    .block-container {
+        padding-top: 4.75rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
 }
 
 /* Banner informativ de sus */

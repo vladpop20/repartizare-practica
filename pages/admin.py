@@ -292,6 +292,11 @@ def load_admin_css() -> None:
 }
 
 @media (max-width: 768px) {
+    .block-container {
+        padding-top: 4.75rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
     .kpi-row {
         grid-template-columns: repeat(2, 1fr);
     }
