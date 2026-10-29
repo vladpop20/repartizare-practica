@@ -13,6 +13,334 @@ def render_html(html_str: str) -> None:
         st.markdown(clean, unsafe_allow_html=True)
 
 
+def init_theme_state() -> None:
+    """Inițializează starea temei globale în session_state dacă nu există."""
+    if "theme_mode" not in st.session_state:
+        st.session_state["theme_mode"] = "dark"
+
+
+def get_theme_mode() -> str:
+    """Returnează tema curentă ('dark' sau 'light')."""
+    init_theme_state()
+    return st.session_state.get("theme_mode", "dark")
+
+
+def render_theme_toggle(key_suffix: str = "main") -> None:
+    """
+    Randează un slider/switch modern pentru comutarea între Mod Întunecat și Mod Luminos.
+    Este optimizat pentru afișare impecabilă atât pe ecrane mari, cât și pe mobil.
+    """
+    init_theme_state()
+    is_light = (st.session_state.get("theme_mode") == "light")
+    toggle_label = "☀️ Mod Luminos" if is_light else "🌙 Mod Întunecat"
+
+    def _on_toggle_changed():
+        val = st.session_state[f"theme_toggle_{key_suffix}"]
+        st.session_state["theme_mode"] = "light" if val else "dark"
+
+    st.toggle(
+        toggle_label,
+        value=is_light,
+        key=f"theme_toggle_{key_suffix}",
+        on_change=_on_toggle_changed,
+        help="Comută tema întregii aplicații între Mod Întunecat și Mod Luminos",
+    )
+
+
+def get_theme_css() -> str:
+    """Generează CSS-ul de suprascriere pentru tema luminoasă când aceasta este activă."""
+    init_theme_state()
+    if st.session_state.get("theme_mode") != "light":
+        return ""
+
+    return """
+<style>
+/* ========================================================
+   GLOBAL LIGHT THEME OVERRIDES (Activ la selectarea Mod Luminos)
+   ======================================================== */
+
+.stApp,
+body,
+[data-testid="stAppViewContainer"],
+.main {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+}
+
+/* Bara de sus Streamlit în modul luminos */
+header[data-testid="stHeader"] {
+    background: rgba(248, 250, 252, 0.96) !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+header[data-testid="stHeader"] button,
+header[data-testid="stHeader"] svg {
+    color: #0f172a !important;
+    fill: #0f172a !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+section[data-testid="stSidebar"] * {
+    color: #1e293b !important;
+}
+
+/* Titluri și texte */
+h1, h2, h3, h4, h5, h6 {
+    color: #0f172a !important;
+}
+div[data-testid="stCaptionContainer"] p {
+    color: #475569 !important;
+}
+
+/* Formulare și carduri */
+div[data-testid="stForm"] {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+div[data-baseweb="input"] {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+}
+div[data-baseweb="input"] input {
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+}
+div[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+div[data-baseweb="select"] * {
+    color: #0f172a !important;
+}
+ul[role="listbox"], div[data-baseweb="menu"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+}
+li[role="option"] {
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+}
+li[role="option"]:hover, li[aria-selected="true"] {
+    background-color: #f1f5f9 !important;
+}
+
+/* Card profil elev conectat */
+.student-profile-header {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+    border: 1px solid #bfdbfe !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08) !important;
+}
+.profile-greeting {
+    color: #1e3a8a !important;
+}
+.profile-spec-badge {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    border: 1px solid #93c5fd !important;
+}
+
+/* Card sesiune activă */
+.session-active-card {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+    border: 1px solid #a7f3d0 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08) !important;
+}
+.session-status-tag {
+    color: #047857 !important;
+}
+.session-title-text {
+    color: #064e3b !important;
+}
+.session-badge-pill {
+    background: #a7f3d0 !important;
+    color: #065f46 !important;
+    border: 1px solid #6ee7b7 !important;
+}
+
+/* Carduri Mod Real & Simulare */
+.turn-active-card {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+    border: 1.5px solid #6ee7b7 !important;
+}
+.turn-active-card .turn-title {
+    color: #064e3b !important;
+}
+.turn-active-card .turn-desc {
+    color: #065f46 !important;
+}
+
+.turn-waiting-card {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+    border: 1.5px solid #fde68a !important;
+}
+.turn-waiting-card .turn-title {
+    color: #92400e !important;
+}
+.turn-waiting-card .turn-desc {
+    color: #78350f !important;
+}
+.turn-status-box {
+    background: #ffffff !important;
+    border: 1px solid #fde68a !important;
+    color: #78350f !important;
+}
+.turn-current-person {
+    color: #b45309 !important;
+}
+.turn-my-position {
+    color: #475569 !important;
+}
+
+.turn-completed-card {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+    border: 1.5px solid #93c5fd !important;
+}
+.turn-completed-card .turn-title {
+    color: #1e3a8a !important;
+}
+.turn-completed-card .turn-desc {
+    color: #1e40af !important;
+}
+
+.saved-choice-banner {
+    background: #f0fdf4 !important;
+    border: 1px solid #86efac !important;
+}
+.saved-choice-label {
+    color: #15803d !important;
+}
+.saved-choice-val {
+    color: #14532d !important;
+}
+
+.mode-simulare-pill {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    color: #1d4ed8 !important;
+}
+
+/* Tabele și carduri Admin */
+.admin-login-box {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+.admin-login-title {
+    color: #0f172a !important;
+}
+.admin-login-desc {
+    color: #64748b !important;
+}
+.kpi-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+.kpi-lbl {
+    color: #64748b !important;
+}
+.admin-table-container {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+.admin-table-header {
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+.admin-table-title {
+    color: #0f172a !important;
+}
+.admin-table-count {
+    color: #64748b !important;
+}
+.admin-table th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+}
+.admin-table td {
+    color: #1e293b !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+.admin-table tr:hover td {
+    background: #f8fafc !important;
+}
+.config-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+.config-section-title {
+    color: #0f172a !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+.config-desc {
+    color: #475569 !important;
+}
+
+/* Carduri Unități în Situația în timp real */
+.unit-block {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+.unit-block-header {
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+.unit-title {
+    color: #0f172a !important;
+}
+.section-subtitle {
+    color: #64748b !important;
+}
+.slot-empty-boy {
+    border: 1.5px dashed #93c5fd !important;
+    background: #eff6ff !important;
+}
+.slot-empty-girl {
+    border: 1.5px dashed #fca5a5 !important;
+    background: #fef2f2 !important;
+}
+.stats-panel {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+.stats-panel * {
+    color: #0f172a !important;
+}
+.info-alert-banner {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    color: #1d4ed8 !important;
+}
+.order-alert-banner, .footer-alert-banner {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    color: #047857 !important;
+}
+
+/* Elemente de expander și tabs */
+div[data-testid="stExpander"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+}
+button[data-baseweb="tab"] {
+    color: #64748b !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #2563eb !important;
+}
+</style>
+"""
+
+
 def load_css():
     render_html("""
 <style>
@@ -514,6 +842,7 @@ def load_css():
 }
 </style>
 """)
+    render_html(get_theme_css())
 
 
 def render_unit_card(unit_name: str, unit: dict, cautare: str = "") -> None:

@@ -11,7 +11,8 @@ from ui_utils import (
     load_css,
     render_html,
     render_unit_card,
-    render_stats_sidebar
+    render_stats_sidebar,
+    render_theme_toggle
 )
 
 st.set_page_config(
@@ -28,10 +29,14 @@ st_autorefresh(
 load_css()
 
 #
-# Titlu și info banner
+# Titlu și comutator temă
 #
-st.title("📊 Situația în timp real")
-st.caption("Actualizare automată la fiecare 10 secunde")
+col_title, col_theme = st.columns([3.8, 1.2], vertical_alignment="center")
+with col_title:
+    st.title("📊 Situația în timp real")
+    st.caption("Actualizare automată la fiecare 10 secunde")
+with col_theme:
+    render_theme_toggle("monitor")
 
 render_html("""
 <div class="info-alert-banner">

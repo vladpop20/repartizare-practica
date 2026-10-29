@@ -5,7 +5,9 @@ import importlib
 import sessions_manager as sm
 importlib.reload(sm)
 from monitor_utils import normalize_spec
-from ui_utils import render_html
+from ui_utils import render_html, render_theme_toggle, get_theme_css
+from student_utils import get_gender
+import excel_export
 
 ADMIN_PASSWORD = "Practica2026"
 
@@ -291,6 +293,50 @@ def load_admin_css() -> None:
     display: inline-block;
 }
 
+.badge-gender-m {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.badge-gender-f {
+    background: rgba(236, 72, 153, 0.15);
+    color: #f472b6;
+    border: 1px solid rgba(236, 72, 153, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.badge-confirmed {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.badge-waiting {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
 @media (max-width: 768px) {
     .block-container {
         padding-top: 4.75rem !important;
@@ -303,6 +349,7 @@ def load_admin_css() -> None:
 }
 </style>
 """)
+    render_html(get_theme_css())
 
 
 def get_spec_badge_html(spec: str) -> str:
@@ -369,7 +416,7 @@ if not st.session_state["admin_authenticated"]:
 # ============================================================
 # Panou Admin Conectat
 # ============================================================
-header_left, header_right = st.columns([5, 1.2], vertical_alignment="center")
+header_left, header_mid, header_right = st.columns([3.6, 1.4, 1.2], vertical_alignment="center")
 with header_left:
     render_html("""
     <div style="margin-bottom: 8px;">
@@ -377,6 +424,8 @@ with header_left:
         <div style="color: #94a3b8; font-size: 13.5px; margin-top: 4px;">Gestiune sesiuni de practică, import promoții și evidența alegerilor</div>
     </div>
     """)
+with header_mid:
+    render_theme_toggle("admin")
 with header_right:
     render_html('<div class="logout-btn-container">')
     if st.button("🚪 Deconectare", use_container_width=True, key="admin_logout_btn"):
@@ -393,8 +442,9 @@ active_session = sm.get_active_session()
 #
 # TABURI PRINCIPALE ADMIN
 #
-tab_evidence, tab_edit, tab_config = st.tabs([
+tab_evidence, tab_results, tab_edit, tab_config = st.tabs([
     "📋 Evidență & Alegeri în timp real",
+    "📑 Rezultate Finale & Export Excel",
     "✏️ Editare Date (Elevi & Unități)",
     "⚙️ Configurare Promoții & Sesiuni (Import Excel)"
 ])
@@ -594,7 +644,213 @@ with tab_evidence:
 
 
 # ============================================================
-# TAB 2: EDITARE DATE REALE (ELEVI & UNITĂȚI)
+# TAB 2: REZULTATE FINALE & EXPORT EXCEL
+# ============================================================
+with tab_results:
+    render_html("""
+    <div class="config-section-card">
+        <div class="config-section-title">📑 Raport Oficial Rezultate & Export Excel</div>
+        <div class="guide-box">
+            📄 <b>Generare & Export Tabel Nominal:</b> Previzualizează situația centralizată a repartizării elevilor pe unități
+            și descarcă raportul oficial formatat în Excel (<code>.xlsx</code>). Documentul generat conține <b>încadrare grafică completă,
+            distincție coloristică pe specializări, nume și gen</b>, precum și foi de calcul dedicate pentru fiecare armă militară în parte.
+        </div>
+    </div>
+    """)
+
+    # Selector sesiune
+    res_session_titles = [s["title"] for s in all_sessions]
+    res_default_idx = 0
+    if active_session:
+        for idx, s in enumerate(all_sessions):
+            if s["id"] == active_session["id"]:
+                res_default_idx = idx
+                break
+
+    col_res_s1, col_res_s2 = st.columns([4, 1.5], vertical_alignment="center")
+    with col_res_s1:
+        res_selected_title = st.selectbox(
+            "Selectează sesiunea pentru raportul de rezultate:",
+            res_session_titles,
+            index=res_default_idx,
+            key="results_session_select"
+        )
+    with col_res_s2:
+        res_session = next((s for s in all_sessions if s["title"] == res_selected_title), all_sessions[0])
+        if res_session.get("is_active"):
+            render_html('<div style="margin-top: 25px;"><span class="status-active-badge">🟢 Sesiune Activă</span></div>')
+        else:
+            render_html('<div style="margin-top: 25px;"><span class="status-inactive-badge">📁 Sesiune Închisă</span></div>')
+
+    res_sess_id = res_session["id"]
+    res_students = sm.get_students_for_session(res_sess_id)
+    res_choices = sm.get_choices_for_session(res_sess_id)
+    res_units = sm.get_session_units_dict(res_sess_id)
+    res_choices_map = {c["student_id"]: c for c in res_choices}
+
+    res_records = []
+    for s in res_students:
+        s_id = s["id"]
+        c = res_choices_map.get(s_id)
+        opt1 = c.get("option1") if c else None
+        spec = s.get("specialization", "")
+        norm = normalize_spec(spec)
+        first_n = s.get("first_name", "")
+        last_n = s.get("last_name", "")
+        gen = s.get("gender") or get_gender(spec, first_n, last_n)
+
+        res_records.append({
+            "id": s_id,
+            "first_name": first_n,
+            "last_name": last_n,
+            "nume_complet": f"{last_n} {first_n}".strip(),
+            "average": float(s.get("average", 0.0)),
+            "specialization": spec,
+            "norm_spec": norm,
+            "gender": gen,
+            "option1": opt1,
+            "has_option": bool(opt1),
+        })
+
+    # Sortare primară pe specializare, descrescător pe medie, apoi alfabetic
+    res_records.sort(key=lambda x: (x["norm_spec"], -x["average"], x["last_name"], x["first_name"]))
+
+    # Carduri KPI
+    res_total = len(res_students)
+    res_enrolled = len([r for r in res_records if r["has_option"]])
+    res_unenrolled = max(res_total - res_enrolled, 0)
+    res_pct = (res_enrolled / res_total * 100) if res_total > 0 else 0
+
+    render_html(f"""
+    <div class="kpi-row">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-num">{res_total}</div>
+            <div class="kpi-lbl">Total elevi înscriși</div>
+        </div>
+        <div class="kpi-card kpi-green">
+            <div class="kpi-num">{res_enrolled}</div>
+            <div class="kpi-lbl">Repartizați ({res_pct:.1f}%)</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+            <div class="kpi-num">{res_unenrolled}</div>
+            <div class="kpi-lbl">În așteptare (fără loc)</div>
+        </div>
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-num">{len(res_units)}</div>
+            <div class="kpi-lbl">Unități disponibile</div>
+        </div>
+    </div>
+    """)
+
+    # Buton principal mare de descărcare Excel
+    excel_bytes = excel_export.generate_repartition_excel(
+        session_title=res_session["title"],
+        records=res_records,
+        units_dict=res_units
+    )
+    safe_slug = res_session["title"].replace(" ", "_").replace("—", "-").replace("(", "").replace(")", "").replace(".", "")
+
+    col_btn_export, col_info_export = st.columns([2.5, 2], vertical_alignment="center")
+    with col_btn_export:
+        st.download_button(
+            label=f"📥 Descarcă Tabel Excel Formatat (.xlsx) — {res_total} elevi",
+            data=excel_bytes,
+            file_name=f"Rezultate_Repartizare_{safe_slug}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            type="primary",
+            key="btn_download_results_excel"
+        )
+    with col_info_export:
+        st.caption("📊 Fișierul conține 5 foi de calcul Excel (Sinteză + Foi separate pe fiecare armă militară), cu formatare și culori pe profil, nume și gen.")
+
+    st.write("---")
+    st.subheader("👁️ Previzualizare tabelară rezultate")
+
+    # Filtre interactive pentru previzualizare
+    f_c1, f_c2, f_c3, f_c4 = st.columns([1.5, 1.2, 1, 2])
+    with f_c1:
+        spec_opts = ["Toate Specializările"] + sorted(list(set(r["norm_spec"] for r in res_records)))
+        sel_spec_filter = st.selectbox("Filtrează după armă:", spec_opts, key="res_filter_spec")
+    with f_c2:
+        status_opts = ["Toți elevii", "Doar cei repartizați", "Doar în așteptare"]
+        sel_status_filter = st.selectbox("Filtrează după status:", status_opts, key="res_filter_status")
+    with f_c3:
+        gender_opts = ["Toate", "Băieți (B)", "Fete (F)"]
+        sel_gender_filter = st.selectbox("Gen:", gender_opts, key="res_filter_gender")
+    with f_c4:
+        search_query = st.text_input("Caută elev după nume:", "", key="res_filter_search", placeholder="Tastați numele sau prenumele...")
+
+    # Aplicare filtre
+    filtered_results = res_records
+    if sel_spec_filter != "Toate Specializările":
+        filtered_results = [r for r in filtered_results if r["norm_spec"] == sel_spec_filter]
+    if sel_status_filter == "Doar cei repartizați":
+        filtered_results = [r for r in filtered_results if r["has_option"]]
+    elif sel_status_filter == "Doar în așteptare":
+        filtered_results = [r for r in filtered_results if not r["has_option"]]
+    if sel_gender_filter == "Băieți (B)":
+        filtered_results = [r for r in filtered_results if r["gender"] in ("B", "M")]
+    elif sel_gender_filter == "Fete (F)":
+        filtered_results = [r for r in filtered_results if r["gender"] == "F"]
+    if search_query.strip():
+        q = search_query.strip().lower()
+        filtered_results = [r for r in filtered_results if q in r["nume_complet"].lower()]
+
+    # Construire rânduri tabel HTML stilat
+    res_table_rows = []
+    for idx, r in enumerate(filtered_results, start=1):
+        spec_badge = get_spec_badge_html(r["specialization"])
+        gender_badge = '<span class="badge-gender-f">👩 Fată</span>' if r["gender"] == "F" else '<span class="badge-gender-m">👨 Băiat</span>'
+
+        if r["has_option"]:
+            status_badge = '<span class="badge-confirmed">✅ Confirmat</span>'
+            unit_disp = f"<b>{r['option1']}</b>"
+        else:
+            status_badge = '<span class="badge-waiting">⏳ În așteptare</span>'
+            unit_disp = '<span style="color: #ef4444; font-style: italic;">— Fără opțiune aleasă —</span>'
+
+        res_table_rows.append(f"""
+        <tr>
+            <td style="text-align: center; font-weight: 600; color: #94a3b8;">{idx}</td>
+            <td><b>{r['last_name'].upper()}</b> {r['first_name']}</td>
+            <td style="text-align: center;">{gender_badge}</td>
+            <td style="text-align: center; font-weight: 700;">{r['average']:.2f}</td>
+            <td>{spec_badge}</td>
+            <td>{unit_disp}</td>
+            <td style="text-align: center;">{status_badge}</td>
+        </tr>
+        """)
+
+    res_table_html = f"""
+    <div class="admin-table-container">
+        <div class="admin-table-header">
+            <div class="admin-table-title">📑 Tabel Rezultate — {res_session['title']}</div>
+            <div class="admin-table-count">Afișați <b>{len(filtered_results)}</b> din {res_total} elevi</div>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px; text-align: center;">Nr.</th>
+                    <th>Nume și Prenume Elev</th>
+                    <th style="text-align: center;">Gen</th>
+                    <th style="text-align: center;">Medie</th>
+                    <th>Specializare</th>
+                    <th>Unitate Repartizată</th>
+                    <th style="text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {"".join(res_table_rows) if res_table_rows else '<tr><td colspan="7" style="text-align: center; padding: 24px; color: #94a3b8;">Niciun elev nu corespunde criteriilor de filtrare selectate.</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+    """
+    render_html(res_table_html)
+
+
+# ============================================================
+# TAB 3: EDITARE DATE REALE (ELEVI & UNITĂȚI)
 # ============================================================
 with tab_edit:
     render_html("""
@@ -883,7 +1139,7 @@ with tab_edit:
 
 
 # ============================================================
-# TAB 3: CONFIGURARE PROMOȚII & SESIUNI (IMPORT EXCEL)
+# TAB 4: CONFIGURARE PROMOȚII & SESIUNI (IMPORT EXCEL)
 # ============================================================
 with tab_config:
     # ------------------------------------------------------------

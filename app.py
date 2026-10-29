@@ -15,7 +15,7 @@ from students_db import (
     login,
 )
 from monitor_utils import normalize_spec
-from ui_utils import render_html
+from ui_utils import render_html, render_theme_toggle, get_theme_css
 
 
 def load_app_css() -> None:
@@ -312,6 +312,7 @@ div[data-testid="stForm"] {
 }
 </style>
 """)
+    render_html(get_theme_css())
 
 
 def init_session_state() -> None:
@@ -553,6 +554,13 @@ def render_options(student_record: dict, units: dict, active_session_id: str) ->
 # ============================================================
 init_session_state()
 load_app_css()
+
+# Bara de sus: etichetă oficială și comutator Mod Întunecat / Mod Luminos
+top_bar_l, top_bar_r = st.columns([2.2, 1.4], vertical_alignment="center")
+with top_bar_l:
+    render_html('<div style="font-size: 0.82rem; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase;">🏛️ MApN • Repartizare</div>')
+with top_bar_r:
+    render_theme_toggle("app")
 
 st.title("🎓 Repartizare practică")
 st.caption("Sistem de simulare și alocare a stagiilor de practică")
